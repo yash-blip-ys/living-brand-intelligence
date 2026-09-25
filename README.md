@@ -12,15 +12,11 @@ It is not a brand-book generator and not a chat box that writes marketing copy. 
 
 The full loop in one pass: a rough idea becomes structured context, context becomes approved brand decisions, the critic stress-tests them, the kit is exported, and then a new founder fact arrives and the system shows exactly which decision it invalidates.
 
-<a href="video-EZRlGyG76uDg4hV7TpJ5.mp4">
-  <video
-    src="video-EZRlGyG76uDg4hV7TpJ5.mp4"
-    controls
-    preload="metadata"
-    width="100%"
-  ></video>
-  <em>▶ Watch the walkthrough (MP4, 6 MB) — if the player does not load, open the file directly.</em>
-</a>
+[![Living Brand Intelligence demo](demo.gif)](https://app.arcade.software/share/videos/EZRlGyG76uDg4hV7TpJ5)
+
+[Watch the full interactive demo](https://app.arcade.software/share/videos/EZRlGyG76uDg4hV7TpJ5)
+
+<sub>Preview GIF generated from the demo recording in this repository. The original video is untouched: [video-EZRlGyG76uDg4hV7TpJ5.mp4](video-EZRlGyG76uDg4hV7TpJ5.mp4) — 63 s, 1920×1080, 6.2 MB.</sub>
 
 ---
 
