@@ -11,12 +11,14 @@ import {
   getDecisionContextLinks,
   type NewDecisionContextLinkInput,
 } from "@/lib/db/brand-decisions";
-import { runBrandCritic, type ChallengeIssue } from "@/lib/ai/challenge";
+import type { ChallengeIssue } from "@/lib/ai/challenge";
+import { type ConsistencyPairResult } from "@/lib/ai/consistency";
 import {
-  runConsistencyGuardian,
-  type ConsistencyPairResult,
-} from "@/lib/ai/consistency";
-import { runStrategyAnalyst } from "@/lib/ai/strategy";
+  orchestrateConsistency,
+  orchestrateCritique,
+  orchestrateStrategyGeneration,
+} from "@/lib/ai/orchestration";
+import type { BrandEvaluation, BrandEvaluationEvidence } from "@/lib/ai/evaluation/evaluator";
 import type { BrandDecision, ContextItem, BrandDecisionCategory } from "@/lib/types/database";
 import {
   type ProposedDecisionDraft,
@@ -30,6 +32,9 @@ export type ChallengeCritiqueState = {
   error?: string;
   configError?: boolean;
   issues?: ChallengeIssue[] | null;
+  evaluations?: BrandEvaluation[] | null;
+  evaluationError?: string | null;
+  referenceIds?: string[];
   dismissedIssueIds?: string[];
   revisedDecisionDraftId?: string | null;
   revised?: ProposedDecisionDraft[] | null;
@@ -39,6 +44,9 @@ export type ConsistencyCheckState = {
   error?: string;
   configError?: boolean;
   pair_results?: ConsistencyPairResult[] | null;
+  evaluations?: BrandEvaluation[] | null;
+  evaluationError?: string | null;
+  referenceIds?: string[];
   revisedDecisionDraftId?: string | null;
   revised?: ProposedDecisionDraft[] | null;
 };
@@ -52,6 +60,37 @@ export type ChallengeReviseState = StrategyActionState;
 
 const EMPTY_CRITIQUE: ChallengeCritiqueState = {};
 const EMPTY_DISMISS: ChallengeDismissState = {};
+
+type DecisionLinks = Awaited<ReturnType<typeof getDecisionContextLinks>>;
+
+function buildEvaluationMaps(
+  decisionIds: readonly string[],
+  links: DecisionLinks,
+  approved: readonly ContextItem[],
+): {
+  evidenceByDecisionId: Record<string, BrandEvaluationEvidence[]>;
+  supportingIdsByDecisionId: Record<string, string[]>;
+} {
+  const approvedById = new Map(approved.map((item) => [item.id, item]));
+  const evidenceByDecisionId: Record<string, BrandEvaluationEvidence[]> = {};
+  const supportingIdsByDecisionId: Record<string, string[]> = {};
+  for (const decisionId of decisionIds) {
+    evidenceByDecisionId[decisionId] = [];
+    supportingIdsByDecisionId[decisionId] = [];
+  }
+  for (const link of links) {
+    const evidence = approvedById.get(link.context_item_id);
+    if (!evidence || !evidenceByDecisionId[link.decision_id]) continue;
+    if (supportingIdsByDecisionId[link.decision_id].includes(evidence.id)) continue;
+    supportingIdsByDecisionId[link.decision_id].push(evidence.id);
+    evidenceByDecisionId[link.decision_id].push({
+      id: evidence.id,
+      type: evidence.type,
+      content: evidence.content,
+    });
+  }
+  return { evidenceByDecisionId, supportingIdsByDecisionId };
+}
 
 function categoryForPair(pair: string): BrandDecisionCategory | null {
   const priorityOrder: BrandDecisionCategory[] = [
@@ -125,13 +164,6 @@ export async function runChallengeCritique(
   } catch {
     links = [];
   }
-  const supportingByDecision = new Map<string, string[]>();
-  for (const l of links) {
-    const arr = supportingByDecision.get(l.decision_id) ?? [];
-    arr.push(l.context_item_id);
-    supportingByDecision.set(l.decision_id, arr);
-  }
-
   let ctx: ContextItem[] = [];
   try {
     ctx = await getContextItems(startupId);
@@ -141,23 +173,29 @@ export async function runChallengeCritique(
   }
   const approved = await filterActiveApprovedContext(ctx);
 
-  const criticInputs = active.map((d) => ({
-    id: d.id,
-    category: d.category,
-    title: d.title,
-    content: d.content,
-    rationale: d.rationale,
-    supporting_context_ids: supportingByDecision.get(d.id) ?? [],
-  }));
+  const evaluationMaps = buildEvaluationMaps(
+    active.map((d) => d.id),
+    links,
+    approved,
+  );
 
-  const res = await runBrandCritic(criticInputs, approved);
+  const res = await orchestrateCritique({
+    decisions: active,
+    approvedContext: approved,
+    ...evaluationMaps,
+  });
   if (!res.ok) {
     if (res.err.kind === "config") {
       return { configError: true, error: res.err.message };
     }
     return { error: res.err.message };
   }
-  return { issues: res.result.issues };
+  return {
+    issues: res.result.issues,
+    evaluations: res.result.evaluations,
+    evaluationError: res.result.evaluationError,
+    referenceIds: res.result.referenceIds,
+  };
 }
 
 export async function dismissChallengeIssue(
@@ -235,12 +273,14 @@ export async function reviseDecisionFromChallenge(
     .filter((d) => d.status === "active" && d.id !== excludeDecisionId)
     .map((d) => ({ category: d.category, title: d.title, content: d.content }));
 
-  const res = await runStrategyAnalyst(
+  const res = await orchestrateStrategyGeneration({
     roughIdea,
-    approved,
+    approvedContext: approved,
     existingActive,
-    challengeGuidance,
-  );
+    strategicGuidance: challengeGuidance,
+    workflow: "revision",
+    categories: [categoryRaw.toUpperCase() as BrandDecisionCategory],
+  });
 
   if (!res.ok) {
     if (res.err.kind === "config") {
@@ -274,20 +314,42 @@ export async function runConsistencyCheck(
     return { error: message };
   }
   const active = decisions.filter((d) => d.status === "active");
-  const byCategory = new Map<BrandDecisionCategory, BrandDecision[]>();
-  for (const d of active) {
-    const arr = byCategory.get(d.category) ?? [];
-    arr.push(d);
-    byCategory.set(d.category, arr);
+  let links: DecisionLinks = [];
+  try {
+    links = await getDecisionContextLinks(startupId);
+  } catch {
+    links = [];
   }
-  const res = await runConsistencyGuardian(byCategory);
+  let ctx: ContextItem[] = [];
+  try {
+    ctx = await getContextItems(startupId);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Could not load context.";
+    return { error: message };
+  }
+  const approved = await filterActiveApprovedContext(ctx);
+  const evaluationMaps = buildEvaluationMaps(
+    active.map((d) => d.id),
+    links,
+    approved,
+  );
+  const res = await orchestrateConsistency({
+    decisions: active,
+    approvedContext: approved,
+    ...evaluationMaps,
+  });
   if (!res.ok) {
     if (res.err.kind === "config") {
       return { configError: true, error: res.err.message };
     }
     return { error: res.err.message };
   }
-  return { pair_results: res.result.pair_results };
+  return {
+    pair_results: res.result.pair_results,
+    evaluations: res.result.evaluations,
+    evaluationError: res.result.evaluationError,
+    referenceIds: res.result.referenceIds,
+  };
 }
 
 export async function reviseDecisionFromConsistency(

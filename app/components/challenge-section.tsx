@@ -24,6 +24,7 @@ import {
 import type { BrandDecision, BrandDecisionCategory, ContextItem } from "@/lib/types/database";
 import type { ChallengeIssue } from "@/lib/ai/challenge";
 import type { ConsistencyPairResult } from "@/lib/ai/consistency";
+import type { BrandEvaluation } from "@/lib/ai/evaluation/evaluator";
 import type { DecisionContextSupport } from "@/lib/db/brand-decisions";
 
 type Props = {
@@ -44,6 +45,72 @@ const RESULT_STYLE: Record<string, string> = {
   "NEEDS REVIEW": "border-amber-600/50 text-amber-700 dark:text-amber-300 bg-amber-500/5",
   CONFLICT: "border-destructive/60 text-destructive bg-destructive/5",
 };
+
+const EVALUATION_STYLE: Record<string, string> = {
+  PASS: "border-emerald-600/60 text-emerald-700 dark:text-emerald-300 bg-emerald-500/5",
+  NEEDS_REVIEW: "border-amber-600/50 text-amber-700 dark:text-amber-300 bg-amber-500/5",
+  REVISE: "border-destructive/60 text-destructive bg-destructive/5",
+};
+
+function EvaluationPanel({ evaluation }: { evaluation?: BrandEvaluation }) {
+  if (!evaluation) return null;
+  return (
+    <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-1">
+      <div className="flex flex-wrap items-center gap-2">
+        <SectionLabel>Decision evaluation</SectionLabel>
+        <span
+          className={`inline-flex items-center text-[10px] uppercase tracking-[0.18em] border rounded-full px-2 py-0.5 font-medium ${
+            EVALUATION_STYLE[evaluation.verdict] ?? EVALUATION_STYLE.PASS
+          }`}
+        >
+          {evaluation.verdict.replace("_", " ")}
+        </span>
+        <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+          {evaluation.provider === "jev" ? "TypeSafe Jev" : "Gemini"}
+        </span>
+        {evaluation.confidence !== null && (
+          <span className="text-[10px] text-muted-foreground">
+            {Math.round(evaluation.confidence * 100)}% confidence
+          </span>
+        )}
+      </div>
+      <p className="text-xs leading-relaxed text-foreground whitespace-pre-wrap pt-1">
+        {evaluation.explanation}
+      </p>
+      {evaluation.revisionGuidance && (
+        <p className="text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap">
+          Bounded revision direction: {evaluation.revisionGuidance}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function WorkflowStrip({
+  referenceIds,
+  evaluations,
+  evaluationError,
+  reviewer,
+}: {
+  referenceIds?: string[];
+  evaluations?: BrandEvaluation[] | null;
+  evaluationError?: string | null;
+  reviewer: string;
+}) {
+  if (!referenceIds?.length) return null;
+  const providers = Array.from(
+    new Set((evaluations ?? []).map((evaluation) => evaluation.provider)),
+  );
+  return (
+    <div className="rounded-xl border border-border bg-muted/20 p-4 text-xs text-muted-foreground leading-relaxed">
+      <span className="font-medium text-foreground">Workflow:</span>{" "}
+      RAG grounding ({referenceIds.join(", ")}) → AI generation → {reviewer} → decision
+      evaluation ({providers.length > 0 ? providers.join(" + ") : "pending"})
+      {evaluationError ? " (unavailable; critic results preserved)" : ""} → bounded revision →
+      founder approval
+    </div>
+  );
+}
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -330,6 +397,12 @@ export function ChallengeSection({
             </p>
           </div>
 
+          <EvaluationPanel
+            evaluation={critiqueState.evaluations?.find(
+              (evaluation) => evaluation.subject === issue.id,
+            )}
+          />
+
           <div className="flex flex-wrap items-center gap-3 pt-2">
             <form action={dismissIssueAction} className="contents">
               <input type="hidden" name="issueId" value={issue.id} />
@@ -521,6 +594,11 @@ export function ChallengeSection({
               </p>
             </div>
           )}
+          <EvaluationPanel
+            evaluation={consistencyState.evaluations?.find(
+              (evaluation) => evaluation.subject === pair.pair,
+            )}
+          />
           {needsFix && (
             <form action={pairReviseAction} className="contents">
               <input type="hidden" name="startupId" value={startupId} />
@@ -568,6 +646,20 @@ export function ChallengeSection({
               every decision pair for internal alignment. Resolve one at a time: Keep,
               Reject, or Suggest Revision.
             </p>
+            <div className="space-y-2 pt-2">
+              <WorkflowStrip
+                referenceIds={critiqueState.referenceIds}
+                evaluations={critiqueState.evaluations}
+                evaluationError={critiqueState.evaluationError}
+                reviewer="Brand Critic"
+              />
+              <WorkflowStrip
+                referenceIds={consistencyState.referenceIds}
+                evaluations={consistencyState.evaluations}
+                evaluationError={consistencyState.evaluationError}
+                reviewer="Consistency Guardian"
+              />
+            </div>
           </div>
           <div className="flex flex-col sm:items-end gap-3">
             <form action={critiqueDispatch} className="contents">

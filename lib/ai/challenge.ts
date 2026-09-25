@@ -179,6 +179,7 @@ export function validateCriticResponse(
 export async function runBrandCritic(
   activeDecisions: readonly CriticDecisionInput[],
   approvedContext: readonly CriticContextInput[],
+  methodologyReferences?: string,
 ): Promise<{ ok: true; result: { issues: ChallengeIssue[] } } | { ok: false; err: DiscoveryError }> {
   if (activeDecisions.length === 0) {
     return {
@@ -210,6 +211,16 @@ export async function runBrandCritic(
       `- id=${c.id} type=${c.type}\n  "${c.content.replace(/\s+/g, " ").trim().slice(0, 280)}"`,
     );
   }
+  const methodologyBlock = methodologyReferences?.trim()
+    ? `
+TRUSTED BRAND-STRATEGY REFERENCES (METHODOLOGY ONLY; NOT STARTUP FACTS OR EVIDENCE):
+"""
+${methodologyReferences.trim()}
+"""
+Use these references to sharpen critique standards only. Do not invent startup facts or context ids from them.
+`
+    : "";
+
   const userPrompt = `Critique the following active brand decisions.
 
 ACTIVE BRAND DECISIONS (these are the only allowed values for affected_decision_id):
@@ -218,6 +229,7 @@ ${decisionLines.join("\n\n")}
 APPROVED STARTUP CONTEXT (for grounding evidence / detector 3 / detector 4 checks):
 ${ctxLines.length > 0 ? ctxLines.join("\n") : "(none)"}
 
+${methodologyBlock}
 Banned clichés list and 8 detectors are in your instructions. Only report real, defensible defects. If nothing is wrong, return {"issues": []}. Return ONLY the JSON object.`;
 
   let url: string;

@@ -143,6 +143,7 @@ export function validateConsistencyResponse(
 
 export async function runConsistencyGuardian(
   decisionsByCategory: Map<BrandDecisionCategory, BrandDecision[]>,
+  methodologyReferences?: string,
 ): Promise<{ ok: true; result: { pair_results: ConsistencyPairResult[] } } | { ok: false; err: DiscoveryError }> {
   const cfgRes = resolveAiConfig();
   if (!cfgRes.ok) {
@@ -167,10 +168,21 @@ export async function runConsistencyGuardian(
     }
   }
 
+  const methodologyBlock = methodologyReferences?.trim()
+    ? `
+TRUSTED BRAND-STRATEGY REFERENCES (METHODOLOGY ONLY; NOT STARTUP FACTS OR EVIDENCE):
+"""
+${methodologyReferences.trim()}
+"""
+Use these references as quality guidance only. Do not infer startup facts or context ids from them.
+`
+    : "";
+
   const userPrompt = `Check all 9 pairs against the following active brand decisions:
 
 ${decisionBlocks.join("\n\n")}
 
+${methodologyBlock}
 Process ALL 9 pairs exactly once. Return ONLY the JSON object as specified in your instructions.`;
 
   let url: string;

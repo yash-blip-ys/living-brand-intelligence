@@ -18,10 +18,10 @@ import type {
   ContextItem,
 } from "@/lib/types/database";
 import {
-  runStrategyAnalyst,
   type StrategyResult,
   type ProposedStrategyDecision,
 } from "@/lib/ai/strategy";
+import { orchestrateStrategyGeneration } from "@/lib/ai/orchestration";
 
 export type ProposedDecisionDraft = {
   tempId: string;
@@ -129,20 +129,21 @@ export async function runStrategyGeneration(
     existingActive = [];
   }
 
-  const res = await runStrategyAnalyst(
+  const res = await orchestrateStrategyGeneration({
     roughIdea,
-    approved.map((c) => ({
+    approvedContext: approved.map((c) => ({
       id: c.id,
       type: c.type,
       content: c.content,
       confidence: c.confidence,
     })),
-    existingActive.map((d) => ({
+    existingActive: existingActive.map((d) => ({
       category: d.category,
       title: d.title,
       content: d.content,
     })),
-  );
+    workflow: "strategy",
+  });
 
   if (!res.ok) {
     const e = res.err;
