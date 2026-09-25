@@ -120,17 +120,20 @@ export function validateConsistencyResponse(
     if (byPair.has(pair)) continue;
     byPair.set(pair, { pair, result, explanation, suggested_fix });
   }
-  // Fill missing pairs: synthesize PASS if AI missed one
+  // Fill omitted pairs conservatively based on whether there is anything to compare.
   for (const [pair, cats] of PAIR_CATEGORIES) {
     if (!byPair.has(pair)) {
-      const anyMissing = cats.some((c) => (decisionsByCategory.get(c)?.length ?? 0) === 0);
+      const anyMissing = cats.some(
+        (c) => (decisionsByCategory.get(c)?.length ?? 0) === 0,
+      );
+
       byPair.set(pair, {
         pair,
-        result: "PASS",
+        result: anyMissing ? "PASS" : "NEEDS REVIEW",
         explanation: anyMissing
           ? "Pair: one side has no active decision yet. Nothing to conflict."
-          : "Consensus alignment — no inconsistency detected.",
-        suggested_fix: null,
+          : "The consistency evaluator did not return a result for this required relationship. Review this pair before treating the brand as consistent.",
+        suggested_fix: anyMissing ? null : "Re-run the consistency check for this relationship.",
       });
     }
   }

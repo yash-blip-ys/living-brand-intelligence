@@ -235,14 +235,12 @@ export async function reviseDecisionFromChallenge(
     .filter((d) => d.status === "active" && d.id !== excludeDecisionId)
     .map((d) => ({ category: d.category, title: d.title, content: d.content }));
 
-  // Append challenge guidance to user prompt by prepending it as a fact-ish note and reusing runStrategyAnalyst.
-  const res = await (async () => {
-    // We cannot easily modify userPrompt inside runStrategyAnalyst from here. So we inject the guidance by
-    // temporarily adding a synthetic DECISION context into approvedContext list? No — supporting_ids must be real.
-    // Instead: append a wrapper — call runStrategyAnalyst with a roughIdea that includes the guidance suffix.
-    const augmentedRough = `${roughIdea}\n\n[BRAND CRITIC GUIDANCE FOR CATEGORY ${categoryRaw} — APPLY WHEN PROPOSING THIS CATEGORY]:\n${challengeGuidance}\n[END GUIDANCE]\n`;
-    return runStrategyAnalyst(augmentedRough, approved, existingActive);
-  })();
+  const res = await runStrategyAnalyst(
+    roughIdea,
+    approved,
+    existingActive,
+    challengeGuidance,
+  );
 
   if (!res.ok) {
     if (res.err.kind === "config") {

@@ -72,7 +72,7 @@ const CLICHES = `Banned generic phrases (never use):
 
 const SYSTEM_PROMPT = `You are a Brand Strategy team for an early-stage startup, composed of: Positioning Strategist, Brand Shaper, Visual Strategist, and Launch Strategist.
 
-Your job is to use ONLY the founder's APPROVED startup context (Facts, Inferences, Hypotheses) to propose concrete brand decisions.
+Your job is to use ONLY the founder's APPROVED startup context (Facts, Inferences, Hypotheses) as factual grounding and evidence for concrete brand decisions. Optional evaluator guidance may direct revisions, but it is never a startup fact or evidence.
 You MUST be honest about uncertainty and never turn a HYPOTHESIS into a FACT.
 Cite specific context items by their id. Be anti-generic.
 
@@ -345,6 +345,7 @@ export async function runStrategyAnalyst(
     title: string;
     content: string;
   }>,
+  strategicGuidance?: string,
 ): Promise<{ ok: true; result: StrategyResult } | { ok: false; err: DiscoveryError }> {
   if (approvedContext.length === 0) {
     return {
@@ -387,6 +388,19 @@ export async function runStrategyAnalyst(
     );
   }
 
+  const guidanceBlock = strategicGuidance?.trim()
+    ? `
+EVALUATOR GUIDANCE (BRAND CRITIC OR CONSISTENCY GUARDIAN; NOT STARTUP FACTS OR EVIDENCE):
+"""
+${strategicGuidance.trim()}
+"""
+
+Use this evaluator guidance to improve the requested strategy decision.
+It is revision guidance only, not a startup fact, claim, source, or evidence.
+Never use it as, or include IDs from it in, supporting_context_ids.
+`
+    : "";
+
   const userPrompt = `Propose concrete brand strategy decisions for this startup.
 
 FOUNDER'S ROUGH IDEA:
@@ -394,16 +408,22 @@ FOUNDER'S ROUGH IDEA:
 ${roughIdea.trim()}
 """
 
-FOUNDER'S APPROVED ACTIVE CONTEXT (use ONLY these — supporting_context_ids must match these ids exactly):
+FOUNDER'S APPROVED ACTIVE CONTEXT (use ONLY these for factual grounding — supporting_context_ids must match these ids exactly):
 ${ctxLines.join("\n")}
 
 EXISTING ACTIVE BRAND DECISIONS (avoid duplicating; if you propose something superseding one of these, still propose a new decision and the UI will handle the transition):
 ${existingLines.length > 0 ? existingLines.join("\n") : "(none yet)"}
 
+${guidanceBlock}
+
 Allowed categories (skip any that are not grounded in the approved context):
 ${CATEGORIES.join(", ")}
 
-Remember: HYPOTHESIS items are NOT confirmed facts. Cite specific ids in supporting_context_ids. Return ONLY the valid JSON object described in your instructions.`;
+Remember:
+- HYPOTHESIS items are NOT confirmed facts.
+- Evaluator guidance is revision guidance, not evidence.
+- supporting_context_ids must contain only IDs from FOUNDER'S APPROVED ACTIVE CONTEXT.
+- Return ONLY the valid JSON object described in your instructions.`;
 
   let url: string;
   let headers: Record<string, string>;
