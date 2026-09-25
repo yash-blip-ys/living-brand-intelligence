@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useFormState, useFormStatus } from "react-dom";
+import { useEffect, useMemo, useState, useActionState } from "react";
+import { useFormStatus } from "react-dom";
 import {
   runChallengeCritique,
   dismissChallengeIssue,
@@ -9,6 +9,7 @@ import {
   reviseDecisionFromChallenge,
   runConsistencyCheck,
   reviseDecisionFromConsistency,
+  useChallengeAlternative as applyChallengeAlternative,
   type ChallengeCritiqueState,
   type ConsistencyCheckState,
   type ChallengeDismissState,
@@ -23,7 +24,8 @@ import {
 } from "@/app/actions/strategy";
 import type { BrandDecision, BrandDecisionCategory, ContextItem } from "@/lib/types/database";
 import type { ChallengeIssue } from "@/lib/ai/challenge";
-import type { ConsistencyPairResult } from "@/lib/ai/consistency";
+import { checkLabel, insufficientEvidenceChecks, type BrandCheck } from "@/lib/ai/brand-checks";
+import { useStageProgress } from "@/app/components/stage-progress";import type { ConsistencyPairResult } from "@/lib/ai/consistency";
 import type { BrandEvaluation } from "@/lib/ai/evaluation/evaluator";
 import type { DecisionContextSupport } from "@/lib/db/brand-decisions";
 
@@ -40,10 +42,18 @@ const SEVERITY_STYLE: Record<string, string> = {
   low: "border-emerald-600/50 text-emerald-700 dark:text-emerald-300 bg-emerald-500/5",
 };
 
+const RESULT_LABEL: Record<string, string> = {
+  PASS: "Pass",
+  NEEDS_REVIEW: "Needs review",
+  INSUFFICIENT_EVIDENCE: "Insufficient evidence",
+  NOT_CHECKED: "Not checked",
+};
+
 const RESULT_STYLE: Record<string, string> = {
   PASS: "border-emerald-600/60 text-emerald-700 dark:text-emerald-300 bg-emerald-500/5",
-  "NEEDS REVIEW": "border-amber-600/50 text-amber-700 dark:text-amber-300 bg-amber-500/5",
-  CONFLICT: "border-destructive/60 text-destructive bg-destructive/5",
+  NEEDS_REVIEW: "border-amber-600/50 text-amber-700 dark:text-amber-300 bg-amber-500/5",
+  INSUFFICIENT_EVIDENCE: "border-border text-muted-foreground bg-muted/20",
+  NOT_CHECKED: "border-border text-muted-foreground bg-muted/20",
 };
 
 const EVALUATION_STYLE: Record<string, string> = {
@@ -51,6 +61,42 @@ const EVALUATION_STYLE: Record<string, string> = {
   NEEDS_REVIEW: "border-amber-600/50 text-amber-700 dark:text-amber-300 bg-amber-500/5",
   REVISE: "border-destructive/60 text-destructive bg-destructive/5",
 };
+
+const CRITIQUE_EMPTY: ChallengeCritiqueState = {};
+const DISMISS_EMPTY: ChallengeDismissState = {};
+const CONSISTENCY_EMPTY: ConsistencyCheckState = {};
+const REVISE_EMPTY: ChallengeReviseState = {};
+
+/* Stable module-level action bindings: keeping the action identity constant across
+   renders is what allows useActionState to hold state instead of resetting. */
+const bindIssueRevise = async (
+  s: ChallengeReviseState | undefined,
+  f: FormData,
+): Promise<ChallengeReviseState> => reviseDecisionFromChallenge(s, f);
+const bindIssueReject = async (
+  s: StrategyActionState | undefined,
+  f: FormData,
+): Promise<StrategyActionState> => rejectDecisionFromChallenge(s, f);
+const bindIssueDismiss = async (
+  s: ChallengeDismissState | undefined,
+  f: FormData,
+): Promise<ChallengeDismissState> => dismissChallengeIssue(s, f);
+const bindPairRevise = async (
+  s: ChallengeReviseState | undefined,
+  f: FormData,
+): Promise<ChallengeReviseState> => reviseDecisionFromConsistency(s, f);
+const bindUseAlternative = async (
+  s: StrategyActionState | undefined,
+  f: FormData,
+): Promise<StrategyActionState> => applyChallengeAlternative(s, f);
+const bindRevisionApprove = async (
+  s: DecisionReviewState | undefined,
+  f: FormData,
+): Promise<DecisionReviewState> => strategyApprove(s, f);
+const bindRevisionReject = async (
+  s: DecisionReviewState | undefined,
+  f: FormData,
+): Promise<DecisionReviewState> => strategyReject(s, f);
 
 function EvaluationPanel({ evaluation }: { evaluation?: BrandEvaluation }) {
   if (!evaluation) return null;
@@ -86,29 +132,83 @@ function EvaluationPanel({ evaluation }: { evaluation?: BrandEvaluation }) {
   );
 }
 
-function WorkflowStrip({
+const REFERENCE_LABEL: Record<string, string> = {
+  positioning: "Positioning",
+  naming: "Naming",
+  voice: "Voice",
+  visual: "Visual",
+  critique: "Critique",
+  consistency: "Consistency",
+  launch: "Launch",
+};
+
+/**
+ * Secondary, collapsed view of the AI pipeline. Kept compact so the Brand Critic
+ * issues stay the primary content; the RAG sources stay visible on the summary line.
+ */
+function WorkflowDisclosure({
   referenceIds,
-  evaluations,
   evaluationError,
-  reviewer,
 }: {
-  referenceIds?: string[];
-  evaluations?: BrandEvaluation[] | null;
-  evaluationError?: string | null;
-  reviewer: string;
+  referenceIds?: (string[] | null | undefined)[];
+  evaluationError?: (string | null | undefined)[];
 }) {
-  if (!referenceIds?.length) return null;
-  const providers = Array.from(
-    new Set((evaluations ?? []).map((evaluation) => evaluation.provider)),
+  const sources = Array.from(
+    new Set(
+      (referenceIds ?? [])
+        .flatMap((ids) => ids ?? [])
+        .map((id) => REFERENCE_LABEL[id] ?? id),
+    ),
   );
+  const unavailable = (evaluationError ?? []).some((err) => Boolean(err));
   return (
-    <div className="rounded-xl border border-border bg-muted/20 p-4 text-xs text-muted-foreground leading-relaxed">
-      <span className="font-medium text-foreground">Workflow:</span>{" "}
-      RAG grounding ({referenceIds.join(", ")}) → AI generation → {reviewer} → decision
-      evaluation ({providers.length > 0 ? providers.join(" + ") : "pending"})
-      {evaluationError ? " (unavailable; critic results preserved)" : ""} → bounded revision →
-      founder approval
-    </div>
+    <details className="group text-[11px] text-muted-foreground">
+      <summary className="cursor-pointer select-none marker:text-muted-foreground/60">
+        RAG grounding
+        {sources.length > 0 ? ` · ${sources.join(" · ")}` : ""} · Brand decisions
+        {unavailable ? " · evaluator unavailable, results preserved" : ""}
+      </summary>
+      <ol className="mt-2 flex flex-wrap gap-x-4 gap-y-1 pl-4 list-decimal">
+        <li>Retrieve references</li>
+        <li>Critique / Consistency</li>
+        <li>Evaluate</li>
+        <li>Bounded revision</li>
+        <li>Founder approval</li>
+      </ol>
+    </details>
+  );
+}
+
+/**
+ * Checks the critic could not ground. They are not defects, so they get their
+ * own quiet surface instead of inflating the issue list or disappearing.
+ */
+function UngroundedChecks({ checks }: { checks: BrandCheck[] }) {
+  if (checks.length === 0) return null;
+  return (
+    <details className="rounded-xl border border-dashed border-border bg-muted/20 p-4 text-xs text-muted-foreground">
+      <summary className="cursor-pointer select-none">
+        {checks.length} check{checks.length > 1 ? "s" : ""} could not be grounded — no verdict, nothing changed
+      </summary>
+      <ul className="mt-3 space-y-2">
+        {checks.map((check) => (
+          <li key={check.id} className="space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <CategoryBadge cat={check.decision_category as BrandDecisionCategory} />
+              <span className="text-[10px] uppercase tracking-[0.18em]">
+                {checkLabel(check.check_type)}
+              </span>
+            </div>
+            {check.reason && <p className="leading-relaxed">{check.reason}</p>}
+            {check.evidence.length > 0 && (
+              <p className="leading-relaxed whitespace-pre-wrap opacity-80">
+                {check.evidence.join("\n")}
+              </p>
+            )}
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }
 
@@ -193,6 +293,19 @@ function RejectDecisionButton() {
   );
 }
 
+function UseAlternativeButton() {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      className="inline-flex h-8 items-center justify-center rounded-full border border-emerald-600/50 bg-emerald-500/[0.06] px-4 text-xs font-medium text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+    >
+      {pending ? "Preparing…" : "Use alternative"}
+    </button>
+  );
+}
+
 function SuggestRevisionButton() {
   const { pending } = useFormStatus();
   return (
@@ -232,10 +345,303 @@ function RejectRevisionButton() {
   );
 }
 
-const CRITIQUE_EMPTY: ChallengeCritiqueState = {};
-const DISMISS_EMPTY: ChallengeDismissState = {};
-const CONSISTENCY_EMPTY: ConsistencyCheckState = {};
-const REVISE_EMPTY: ChallengeReviseState = {};
+function RevisionPreviewCard({
+  draft,
+  startupId,
+}: {
+  draft: ProposedDecisionDraft;
+  startupId: string;
+}) {
+  const [appState, appAction] = useActionState(bindRevisionApprove, {});
+  const [rejState, rejAction] = useActionState(bindRevisionReject, {});
+  void appState;
+  void rejState;
+  return (
+    <div className="rounded-xl border border-emerald-600/30 bg-card overflow-hidden">
+      <div className="p-5 space-y-3">
+        <div className="flex items-center gap-2">
+          <CategoryBadge cat={draft.category} />
+          <h5 className="text-sm font-semibold text-foreground tracking-tight">
+            {draft.title}
+          </h5>
+        </div>
+        <p className="text-xs leading-relaxed whitespace-pre-wrap text-foreground">
+          {draft.content}
+        </p>
+        {draft.rationale && (
+          <div className="text-[11px] leading-relaxed text-muted-foreground border-l-2 border-border pl-2.5 whitespace-pre-wrap">
+            <span className="uppercase tracking-[0.18em] mr-1.5 text-[9px]">Rationale</span>
+            {draft.rationale}
+          </div>
+        )}
+        {draft.uncertainty && (
+          <div className="text-[11px] text-amber-700 dark:text-amber-300 whitespace-pre-wrap">
+            <span className="uppercase tracking-[0.18em] mr-1.5 text-[9px]">Uncertainty</span>
+            {draft.uncertainty}
+          </div>
+        )}
+        <div className="flex items-center gap-3 flex-wrap pt-1">
+          <form action={appAction} className="contents">
+            <input type="hidden" name="startupId" value={startupId} />
+            <input type="hidden" name="tempId" value={draft.tempId} />
+            <input type="hidden" name="category" value={draft.category} />
+            <input type="hidden" name="title" value={draft.title} />
+            <input type="hidden" name="content" value={draft.content} />
+            <input type="hidden" name="rationale" value={draft.rationale} />
+            <input
+              type="hidden"
+              name="uncertainty"
+              value={draft.uncertainty ?? ""}
+            />
+            <input
+              type="hidden"
+              name="supporting_context_ids"
+              value={draft.supporting_context_ids.join(",")}
+            />
+            <input type="hidden" name="persistedId" value={draft.persistedId ?? ""} />
+            <ApproveRevisionButton />
+          </form>
+          <form action={rejAction} className="contents">
+            <input type="hidden" name="startupId" value={startupId} />
+            <input type="hidden" name="tempId" value={draft.tempId} />
+            <input type="hidden" name="category" value={draft.category} />
+            <input type="hidden" name="title" value={draft.title} />
+            <input type="hidden" name="content" value={draft.content} />
+            <input type="hidden" name="rationale" value={draft.rationale} />
+            <RejectRevisionButton />
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function IssueCard({
+  issue,
+  decision,
+  startupId,
+  evaluations,
+  error,
+}: {
+  issue: ChallengeIssue;
+  decision?: BrandDecision;
+  startupId: string;
+  evaluations?: BrandEvaluation[] | null;
+  error?: string;
+}) {
+  const [reviseState, reviseAction] = useActionState(bindIssueRevise, REVISE_EMPTY);
+  const [rejectDecState, rejectDecAction] = useActionState(bindIssueReject, {});
+  const [dismissIssueState, dismissIssueAction] = useActionState(
+    bindIssueDismiss,
+    DISMISS_EMPTY,
+  );
+  void rejectDecState;
+  void dismissIssueState;
+
+  const [previews, setPreviews] = useState<ProposedDecisionDraft[]>([]);
+  const [alternativeState, alternativeAction] = useActionState(
+    bindUseAlternative,
+    REVISE_EMPTY,
+  );
+  const proposed =
+    reviseState.proposed ?? alternativeState.proposed ?? null;
+  if (proposed && proposed.length > 0 && previews !== proposed) {
+    setPreviews(proposed);
+  }
+
+  return (
+    <li className="rounded-xl border border-border bg-card text-card-foreground overflow-hidden">
+      <div className="p-5 sm:p-6 space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={`inline-flex items-center text-[10px] uppercase tracking-[0.18em] border rounded-full px-2 py-0.5 font-medium ${
+                SEVERITY_STYLE[issue.severity] ?? SEVERITY_STYLE.low
+              }`}
+            >
+              {checkLabel(issue.check_type)}
+            </span>
+            <CategoryBadge cat={issue.affected_category} />
+            {decision && (
+              <span className="text-xs font-medium text-foreground">{decision.title}</span>
+            )}
+          </div>
+          <SectionLabel>Issue</SectionLabel>
+        </div>
+
+        <div>
+          <h4 className="text-sm font-semibold text-foreground mb-1.5 tracking-tight">
+            {issue.issue_title}
+          </h4>
+          <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap">
+            {issue.issue}
+          </p>
+        </div>
+
+        <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-1">
+          <SectionLabel>Evidence</SectionLabel>
+          <p className="text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap pt-1">
+            {issue.evidence}
+          </p>
+        </div>
+
+        <div className="rounded-lg border border-emerald-600/30 bg-emerald-500/[0.04] p-4 space-y-1">
+          <SectionLabel>Proposed alternative</SectionLabel>
+          <p className="text-xs leading-relaxed text-foreground whitespace-pre-wrap pt-1">
+            {issue.proposed_alternative}
+          </p>
+        </div>
+
+        <EvaluationPanel
+          evaluation={evaluations?.find(
+            (evaluation) => evaluation.subject === issue.id,
+          )}
+        />
+
+        <div className="flex flex-wrap items-center gap-3 pt-2">
+          <form action={dismissIssueAction} className="contents">
+            <input type="hidden" name="issueId" value={issue.id} />
+            <KeepButton />
+          </form>
+          <form action={rejectDecAction} className="contents">
+            <input type="hidden" name="startupId" value={startupId} />
+            <input type="hidden" name="decisionId" value={issue.affected_decision_id} />
+            <RejectDecisionButton />
+          </form>
+          <form action={reviseAction} className="contents">
+            <input type="hidden" name="startupId" value={startupId} />
+            <input type="hidden" name="category" value={issue.affected_category} />
+            <input
+              type="hidden"
+              name="challengeGuidance"
+              value={`ISSUE: ${issue.issue_title}\n${issue.issue}\n\nEVIDENCE:\n${issue.evidence}\n\nPROPOSED ALTERNATIVE:\n${issue.proposed_alternative}`}
+            />
+            <input type="hidden" name="affectedDecisionId" value={issue.affected_decision_id} />
+            <SuggestRevisionButton />
+          </form>
+          <form action={alternativeAction} className="contents">
+            <input type="hidden" name="startupId" value={startupId} />
+            <input type="hidden" name="decisionId" value={issue.affected_decision_id} />
+            <input type="hidden" name="category" value={issue.affected_category} />
+            <input
+              type="hidden"
+              name="alternative"
+              value={issue.proposed_alternative}
+            />
+            <UseAlternativeButton />
+          </form>
+        </div>
+
+        {(error ?? alternativeState.error) && (
+          <p className="text-xs text-destructive">
+            {error ?? alternativeState.error}
+          </p>
+        )}
+
+        {previews.length > 0 && (
+          <div className="border-t border-border pt-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <SectionLabel>Proposed revision · for founder review</SectionLabel>
+              <span className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
+                Approve in Brand tab to apply
+              </span>
+            </div>
+            {previews.map((p) => (
+              <RevisionPreviewCard key={p.tempId} draft={p} startupId={startupId} />
+            ))}
+          </div>
+        )}
+      </div>
+    </li>
+  );
+}
+
+function ConsistencyRow({
+  pair,
+  startupId,
+  evaluations,
+}: {
+  pair: ConsistencyPairResult;
+  startupId: string;
+  evaluations?: BrandEvaluation[] | null;
+}) {
+  const [pairReviseState, pairReviseAction] = useActionState(bindPairRevise, REVISE_EMPTY);
+  const [pairPreviews, setPairPreviews] = useState<ProposedDecisionDraft[]>([]);
+  if (
+    pairReviseState.proposed &&
+    pairReviseState.proposed.length > 0 &&
+    pairPreviews !== pairReviseState.proposed
+  ) {
+    setPairPreviews(pairReviseState.proposed);
+  }
+  const needsFix = pair.result === "NEEDS_REVIEW" && Boolean(pair.suggested_fix);
+  return (
+    <li className="rounded-xl border border-border bg-card text-card-foreground">
+      <div className="p-5 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span
+              className={`inline-flex items-center text-[10px] uppercase tracking-[0.18em] border rounded-full px-2 py-0.5 font-medium ${
+                RESULT_STYLE[pair.result] ?? RESULT_STYLE.NEEDS_REVIEW
+              }`}
+            >
+              {RESULT_LABEL[pair.result] ?? pair.result}
+            </span>
+            <span className="text-sm font-medium text-foreground">{pair.pair}</span>
+          </div>
+        </div>
+        <p className="text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap">
+          {pair.explanation}
+        </p>
+        {pair.evidence.length > 0 && (
+          <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-1">
+            <SectionLabel>Evidence</SectionLabel>
+            <ul className="pt-1 space-y-1 list-disc pl-4">
+              {pair.evidence.map((quote) => (
+                <li
+                  key={quote}
+                  className="text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap"
+                >
+                  {quote}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {needsFix && (
+          <div className="rounded-lg border border-amber-600/40 bg-amber-500/[0.04] p-4 space-y-1">
+            <SectionLabel>Suggested fix</SectionLabel>
+            <p className="text-xs leading-relaxed whitespace-pre-wrap pt-1 text-foreground">
+              {pair.suggested_fix}
+            </p>
+          </div>
+        )}
+        <EvaluationPanel
+          evaluation={evaluations?.find(
+            (evaluation) => evaluation.subject === pair.pair,
+          )}
+        />
+        {needsFix && (
+          <form action={pairReviseAction} className="contents">
+            <input type="hidden" name="startupId" value={startupId} />
+            <input type="hidden" name="pair" value={pair.pair} />
+            <input type="hidden" name="suggestedFix" value={pair.suggested_fix ?? ""} />
+            <div className="pt-1">
+              <SuggestRevisionButton />
+            </div>
+          </form>
+        )}
+        {pairPreviews.length > 0 && (
+          <div className="space-y-3 pt-3 border-t border-border">
+            {pairPreviews.map((d) => (
+              <RevisionPreviewCard key={d.tempId} draft={d} startupId={startupId} />
+            ))}
+          </div>
+        )}
+      </div>
+    </li>
+  );
+}
 
 export function ChallengeSection({
   startupId,
@@ -243,16 +649,16 @@ export function ChallengeSection({
   activeDecisions,
   decisionLinks,
 }: Props) {
-  const [critiqueState, critiqueDispatch] = useFormState(
+  const [critiqueState, critiqueDispatch] = useActionState(
     runChallengeCritique,
     CRITIQUE_EMPTY,
   );
-  const [consistencyState, consistencyDispatch] = useFormState(
+  const [consistencyState, consistencyDispatch] = useActionState(
     runConsistencyCheck,
     CONSISTENCY_EMPTY,
   );
 
-  const [dismissState] = useFormState(dismissChallengeIssue, DISMISS_EMPTY);
+  const [dismissState] = useActionState(dismissChallengeIssue, DISMISS_EMPTY);
 
   const [initialIssuesSeed] = useState<ChallengeIssue[] | undefined>(
     critiqueState.issues ?? undefined,
@@ -277,10 +683,6 @@ export function ChallengeSection({
     ConsistencyPairResult[] | null
   >(initialConsistencySeed ? [...initialConsistencySeed] : null);
 
-  const [revisionPreviews, setRevisionPreviews] = useState<
-    Map<string, ProposedDecisionDraft[]>
-  >(new Map());
-
   const activeOnly = useMemo(
     () => activeDecisions.filter((d) => d.status === "active"),
     [activeDecisions],
@@ -293,7 +695,7 @@ export function ChallengeSection({
   void approvedContext;
   void decisionLinks;
 
-  if (critiqueState.issues && issues.length === 0) {
+  if (critiqueState.issues && issues !== critiqueState.issues) {
     setIssues(critiqueState.issues);
   }
   if (dismissState.dismissedIssueId && !dismissedIds.has(dismissState.dismissedIssueId)) {
@@ -315,311 +717,74 @@ export function ChallengeSection({
     return c;
   }, [visibleIssues]);
   const consistencyCounts = useMemo(() => {
-    const c = { PASS: 0, "NEEDS REVIEW": 0, CONFLICT: 0 };
+    const c = { PASS: 0, NEEDS_REVIEW: 0, INSUFFICIENT_EVIDENCE: 0, NOT_CHECKED: 0 };
     for (const r of consistencyResults ?? []) c[r.result] += 1;
     return c;
   }, [consistencyResults]);
-
-  // Per-issue revise states via local factory closure
-  function IssueCard({ issue }: { issue: ChallengeIssue }) {
-    const binder = makeIssueReviseBinder(issue);
-    const [reviseState, reviseAction] = useFormState(binder.bindRevise, REVISE_EMPTY);
-    const [rejectDecState, rejectDecAction] = useFormState(binder.bindReject, {});
-    const [dismissIssueState, dismissIssueAction] = useFormState(binder.bindDismiss, DISMISS_EMPTY);
-    void reviseState;
-    void rejectDecState;
-    void dismissIssueState;
-
-    const decision = activeById.get(issue.affected_decision_id);
-
-    if (reviseState.proposed && reviseState.proposed.length > 0) {
-      const existing = revisionPreviews.get(issue.id);
-      if (
-        !existing ||
-        existing.length !== reviseState.proposed.length ||
-        existing.some(
-          (d, idx) =>
-            d.tempId !== reviseState.proposed![idx]!.tempId,
-        )
-      ) {
-        setRevisionPreviews((prev) => {
-          const m = new Map(prev);
-          m.set(issue.id, reviseState.proposed!);
-          return m;
-        });
-      }
+  const ungroundedChecks = useMemo(
+    () => insufficientEvidenceChecks(critiqueState.checks ?? []),
+    [critiqueState.checks],
+  );
+  // A completed run is a finished Challenge, whether it found reviewable
+  // defects or not. The stage is marked from the run itself, never from
+  // whether the result happened to be non-empty.
+  const critiqueCompleted = Boolean(critiqueState.issues) && !critiqueState.error;
+  const { markCompleted, publishChallengeRun, publishConsistencyRun } = useStageProgress();
+  useEffect(() => {
+    if (critiqueCompleted) markCompleted("challenge");
+  }, [critiqueCompleted, markCompleted]);
+  // Publish what the run actually returned, so the Deliver Quality cards report
+  // this run instead of a placeholder. Nothing is derived from assumptions here.
+  useEffect(() => {
+    if (critiqueState.issues) {
+      const returned = critiqueState.issues;
+      publishChallengeRun({
+        status: "complete",
+        issueCount: returned.length,
+        high: returned.filter((i) => i.severity === "high").length,
+        medium: returned.filter((i) => i.severity === "medium").length,
+        low: returned.filter((i) => i.severity === "low").length,
+        checksRun: (critiqueState.checks ?? []).length,
+        ungrounded: (critiqueState.checks ?? []).filter(
+          (c) => c.status === "INSUFFICIENT_EVIDENCE",
+        ).length,
+      });
+    } else if (critiqueState.error) {
+      publishChallengeRun({
+        status: "error",
+        issueCount: 0,
+        high: 0,
+        medium: 0,
+        low: 0,
+        checksRun: 0,
+        ungrounded: 0,
+        error: critiqueState.error,
+      });
     }
-
-    const previews = revisionPreviews.get(issue.id) ?? [];
-
-    return (
-      <li className="rounded-xl border border-border bg-card text-card-foreground overflow-hidden">
-        <div className="p-5 sm:p-6 space-y-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <span
-                className={`inline-flex items-center text-[10px] uppercase tracking-[0.18em] border rounded-full px-2 py-0.5 font-medium ${
-                  SEVERITY_STYLE[issue.severity] ?? SEVERITY_STYLE.low
-                }`}
-              >
-                {issue.severity}
-              </span>
-              <CategoryBadge cat={issue.affected_category} />
-              {decision && (
-                <span className="text-xs font-medium text-foreground">
-                  {decision.title}
-                </span>
-              )}
-            </div>
-            <SectionLabel>Issue</SectionLabel>
-          </div>
-
-          <div>
-            <h4 className="text-sm font-semibold text-foreground mb-1.5 tracking-tight">
-              {issue.issue_title}
-            </h4>
-            <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap">
-              {issue.issue}
-            </p>
-          </div>
-
-          <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-1">
-            <SectionLabel>Evidence</SectionLabel>
-            <p className="text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap pt-1">
-              {issue.evidence}
-            </p>
-          </div>
-
-          <div className="rounded-lg border border-emerald-600/30 bg-emerald-500/[0.04] p-4 space-y-1">
-            <SectionLabel>Proposed alternative</SectionLabel>
-            <p className="text-xs leading-relaxed text-foreground whitespace-pre-wrap pt-1">
-              {issue.proposed_alternative}
-            </p>
-          </div>
-
-          <EvaluationPanel
-            evaluation={critiqueState.evaluations?.find(
-              (evaluation) => evaluation.subject === issue.id,
-            )}
-          />
-
-          <div className="flex flex-wrap items-center gap-3 pt-2">
-            <form action={dismissIssueAction} className="contents">
-              <input type="hidden" name="issueId" value={issue.id} />
-              <KeepButton />
-            </form>
-            <form action={rejectDecAction} className="contents">
-              <input type="hidden" name="startupId" value={startupId} />
-              <input type="hidden" name="decisionId" value={issue.affected_decision_id} />
-              <RejectDecisionButton />
-            </form>
-            <form action={reviseAction} className="contents">
-              <input type="hidden" name="startupId" value={startupId} />
-              <input type="hidden" name="category" value={issue.affected_category} />
-              <input
-                type="hidden"
-                name="challengeGuidance"
-                value={`ISSUE: ${issue.issue_title}\n${issue.issue}\n\nEVIDENCE:\n${issue.evidence}\n\nPROPOSED ALTERNATIVE:\n${issue.proposed_alternative}`}
-              />
-              <input type="hidden" name="affectedDecisionId" value={issue.affected_decision_id} />
-              <SuggestRevisionButton />
-            </form>
-          </div>
-
-          {critiqueState.error && (
-            <p className="text-xs text-destructive">{critiqueState.error}</p>
-          )}
-
-          {previews.length > 0 && (
-            <div className="border-t border-border pt-5 space-y-4">
-              <div className="flex items-center justify-between">
-                <SectionLabel>Proposed revision · for founder review</SectionLabel>
-                <span className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
-                  Approve in Brand tab to apply
-                </span>
-              </div>
-              {previews.map((p) => (
-                <RevisionPreviewCard key={p.tempId} draft={p} startupId={startupId} />
-              ))}
-            </div>
-          )}
-        </div>
-      </li>
-    );
-  }
-
-  function makeIssueReviseBinder(_issue: ChallengeIssue) {
-    const bindRevise = async (
-      s: ChallengeReviseState | undefined,
-      f: FormData,
-    ): Promise<ChallengeReviseState> => reviseDecisionFromChallenge(s, f);
-    const bindReject = async (
-      s: StrategyActionState | undefined,
-      f: FormData,
-    ): Promise<StrategyActionState> => rejectDecisionFromChallenge(s, f);
-    const bindDismiss = async (s: ChallengeDismissState | undefined, f: FormData) =>
-      dismissChallengeIssue(s, f);
-    return { bindRevise, bindReject, bindDismiss };
-  }
-
-  function makePairReviseBinder(_pair: ConsistencyPairResult) {
-    const bindPairRevise = async (
-      s: ChallengeReviseState | undefined,
-      f: FormData,
-    ): Promise<ChallengeReviseState> => reviseDecisionFromConsistency(s, f);
-    return { bindPairRevise };
-  }
-
-  function RevisionPreviewCard({
-    draft,
-    startupId,
-  }: {
-    draft: ProposedDecisionDraft;
-    startupId: string;
-  }) {
-    const binder = useMemo(() => {
-      const bindApprove = async (
-        s: DecisionReviewState | undefined,
-        f: FormData,
-      ): Promise<DecisionReviewState> => strategyApprove(s, f);
-      const bindReject = async (
-        s: DecisionReviewState | undefined,
-        f: FormData,
-      ): Promise<DecisionReviewState> => strategyReject(s, f);
-      return { bindApprove, bindReject };
-    }, []);
-    const [appState, appAction] = useFormState(binder.bindApprove, {});
-    const [rejState, rejAction] = useFormState(binder.bindReject, {});
-    void appState;
-    void rejState;
-    return (
-      <div className="rounded-xl border border-emerald-600/30 bg-card overflow-hidden">
-        <div className="p-5 space-y-3">
-          <div className="flex items-center gap-2">
-            <CategoryBadge cat={draft.category} />
-            <h5 className="text-sm font-semibold text-foreground tracking-tight">
-              {draft.title}
-            </h5>
-          </div>
-          <p className="text-xs leading-relaxed whitespace-pre-wrap text-foreground">
-            {draft.content}
-          </p>
-          {draft.rationale && (
-            <div className="text-[11px] leading-relaxed text-muted-foreground border-l-2 border-border pl-2.5 whitespace-pre-wrap">
-              <span className="uppercase tracking-[0.18em] mr-1.5 text-[9px]">Rationale</span>
-              {draft.rationale}
-            </div>
-          )}
-          {draft.uncertainty && (
-            <div className="text-[11px] text-amber-700 dark:text-amber-300 whitespace-pre-wrap">
-              <span className="uppercase tracking-[0.18em] mr-1.5 text-[9px]">Uncertainty</span>
-              {draft.uncertainty}
-            </div>
-          )}
-          <div className="flex items-center gap-3 flex-wrap pt-1">
-            <form action={appAction} className="contents">
-              <input type="hidden" name="startupId" value={startupId} />
-              <input type="hidden" name="tempId" value={draft.tempId} />
-              <input type="hidden" name="category" value={draft.category} />
-              <input type="hidden" name="title" value={draft.title} />
-              <input type="hidden" name="content" value={draft.content} />
-              <input type="hidden" name="rationale" value={draft.rationale} />
-              <input
-                type="hidden"
-                name="uncertainty"
-                value={draft.uncertainty ?? ""}
-              />
-              <input
-                type="hidden"
-                name="supporting_context_ids"
-                value={draft.supporting_context_ids.join(",")}
-              />
-              <input type="hidden" name="persistedId" value={draft.persistedId ?? ""} />
-              <ApproveRevisionButton />
-            </form>
-            <form action={rejAction} className="contents">
-              <input type="hidden" name="startupId" value={startupId} />
-              <input type="hidden" name="tempId" value={draft.tempId} />
-              <input type="hidden" name="category" value={draft.category} />
-              <input type="hidden" name="title" value={draft.title} />
-              <input type="hidden" name="content" value={draft.content} />
-              <input type="hidden" name="rationale" value={draft.rationale} />
-              <RejectRevisionButton />
-            </form>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  function ConsistencyRow({ pair }: { pair: ConsistencyPairResult }) {
-    const binder = makePairReviseBinder(pair);
-    const [pairReviseState, pairReviseAction] = useFormState(binder.bindPairRevise, REVISE_EMPTY);
-    const [initialPairProposed] = useState(pairReviseState.proposed);
-    const [pairPreviews, setPairPreviews] = useState<ProposedDecisionDraft[]>(
-      initialPairProposed ?? [],
-    );
-    void initialPairProposed;
-    if (
-      pairReviseState.proposed &&
-      pairReviseState.proposed.length > 0 &&
-      pairPreviews.length === 0
-    ) {
-      setPairPreviews(pairReviseState.proposed);
+  }, [critiqueState, publishChallengeRun]);
+  useEffect(() => {
+    const rows = consistencyState.pair_results;
+    if (rows) {
+      publishConsistencyRun({
+        status: "complete",
+        total: rows.length,
+        pass: rows.filter((r) => r.result === "PASS").length,
+        needsReview: rows.filter((r) => r.result === "NEEDS_REVIEW").length,
+        insufficientEvidence: rows.filter((r) => r.result === "INSUFFICIENT_EVIDENCE").length,
+        notChecked: rows.filter((r) => r.result === "NOT_CHECKED").length,
+      });
+    } else if (consistencyState.error) {
+      publishConsistencyRun({
+        status: "error",
+        total: 0,
+        pass: 0,
+        needsReview: 0,
+        insufficientEvidence: 0,
+        notChecked: 0,
+        error: consistencyState.error,
+      });
     }
-    const needsFix = pair.result !== "PASS" && pair.suggested_fix;
-    return (
-      <li className="rounded-xl border border-border bg-card text-card-foreground">
-        <div className="p-5 space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <span
-                className={`inline-flex items-center text-[10px] uppercase tracking-[0.18em] border rounded-full px-2 py-0.5 font-medium ${
-                  RESULT_STYLE[pair.result] ?? RESULT_STYLE["NEEDS REVIEW"]
-                }`}
-              >
-                {pair.result}
-              </span>
-              <span className="text-sm font-medium text-foreground">{pair.pair}</span>
-            </div>
-          </div>
-          <p className="text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap">
-            {pair.explanation}
-          </p>
-          {needsFix && (
-            <div className="rounded-lg border border-amber-600/40 bg-amber-500/[0.04] p-4 space-y-1">
-              <SectionLabel>Suggested fix</SectionLabel>
-              <p className="text-xs leading-relaxed whitespace-pre-wrap pt-1 text-foreground">
-                {pair.suggested_fix}
-              </p>
-            </div>
-          )}
-          <EvaluationPanel
-            evaluation={consistencyState.evaluations?.find(
-              (evaluation) => evaluation.subject === pair.pair,
-            )}
-          />
-          {needsFix && (
-            <form action={pairReviseAction} className="contents">
-              <input type="hidden" name="startupId" value={startupId} />
-              <input type="hidden" name="pair" value={pair.pair} />
-              <input type="hidden" name="suggestedFix" value={pair.suggested_fix ?? ""} />
-              <div className="pt-1">
-                <SuggestRevisionButton />
-              </div>
-            </form>
-          )}
-          {pairPreviews.length > 0 && (
-            <div className="space-y-3 pt-3 border-t border-border">
-              {pairPreviews.map((d) => (
-                <RevisionPreviewCard key={d.tempId} draft={d} startupId={startupId} />
-              ))}
-            </div>
-          )}
-        </div>
-      </li>
-    );
-  }
+  }, [consistencyState, publishConsistencyRun]);
 
   return (
     <section className="space-y-8">
@@ -629,16 +794,17 @@ export function ChallengeSection({
             Challenge
           </h2>
           <p className="text-sm text-muted-foreground max-w-xl">
-            Brand Critic detects clichés, contradictions, weak differentiation and other
-            defects. Consistency Guardian cross-checks 9 decision pairs.
+            Brand Critic checks each active decision for generic language, contradictions,
+            bias, audience mismatch, and unsupported claims. Consistency Guardian
+            cross-checks 9 decision pairs. Every finding quotes the wording it rests on.
           </p>
         </div>
       </div>
 
-      <div className="rounded-2xl border border-border bg-card text-card-foreground p-6 sm:p-8 space-y-6">
+      <div className="rounded-2xl border border-border bg-card text-card-foreground p-5 sm:p-6 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div className="max-w-xl space-y-1">
-            <h3 className="text-xl font-semibold leading-tight tracking-tight">
+            <h3 className="text-lg font-semibold leading-tight tracking-tight">
               Press the brand for weak spots
             </h3>
             <p className="text-sm leading-relaxed text-muted-foreground">
@@ -646,18 +812,10 @@ export function ChallengeSection({
               every decision pair for internal alignment. Resolve one at a time: Keep,
               Reject, or Suggest Revision.
             </p>
-            <div className="space-y-2 pt-2">
-              <WorkflowStrip
-                referenceIds={critiqueState.referenceIds}
-                evaluations={critiqueState.evaluations}
-                evaluationError={critiqueState.evaluationError}
-                reviewer="Brand Critic"
-              />
-              <WorkflowStrip
-                referenceIds={consistencyState.referenceIds}
-                evaluations={consistencyState.evaluations}
-                evaluationError={consistencyState.evaluationError}
-                reviewer="Consistency Guardian"
+            <div className="pt-1">
+              <WorkflowDisclosure
+                referenceIds={[critiqueState.referenceIds, consistencyState.referenceIds]}
+                evaluationError={[critiqueState.evaluationError, consistencyState.evaluationError]}
               />
             </div>
           </div>
@@ -763,12 +921,41 @@ export function ChallengeSection({
         {visibleIssues.length > 0 && (
           <ul className="space-y-3">
             {visibleIssues.map((issue) => (
-              <li key={issue.id} className="contents">
-                {IssueCard({ issue })}
-              </li>
+              <IssueCard
+                key={issue.id}
+                issue={issue}
+                decision={activeById.get(issue.affected_decision_id)}
+                startupId={startupId}
+                evaluations={critiqueState.evaluations}
+                error={critiqueState.error}
+              />
             ))}
           </ul>
         )}
+
+        {critiqueCompleted && issues.length === 0 && (
+          <div className="rounded-xl border border-emerald-600/40 bg-emerald-500/[0.04] p-6 text-sm text-muted-foreground text-center space-y-1">
+            <span className="block text-emerald-700 dark:text-emerald-300 font-medium">
+              ✓ No issues found
+            </span>
+            <span className="block">
+              The five checks ran against {activeOnly.length} active decision
+              {activeOnly.length === 1 ? "" : "s"} and found nothing that needs your
+              review. Keep working from the approved decisions, or challenge the
+              reasoning behind any of them in the Brand tab.
+            </span>
+            {ungroundedChecks.length > 0 && (
+              <span className="block text-xs">
+                {ungroundedChecks.length} check
+                {ungroundedChecks.length === 1 ? "" : "s"} could not be grounded — the
+                evidence for {ungroundedChecks.length === 1 ? "it" : "them"} is missing,
+                so no verdict was reported. Details below.
+              </span>
+            )}
+          </div>
+        )}
+
+        <UngroundedChecks checks={ungroundedChecks} />
       </div>
 
       {/* Consistency area */}
@@ -790,15 +977,21 @@ export function ChallengeSection({
               </span>
               <span>
                 <span className="font-medium text-amber-700 dark:text-amber-300">
-                  {consistencyCounts["NEEDS REVIEW"]}
+                  {consistencyCounts.NEEDS_REVIEW}
                 </span>{" "}
                 NEEDS REVIEW
               </span>
               <span>
-                <span className="font-medium text-destructive">
-                  {consistencyCounts.CONFLICT}
+                <span className="font-medium text-muted-foreground">
+                  {consistencyCounts.INSUFFICIENT_EVIDENCE}
                 </span>{" "}
-                CONFLICT
+                INSUFFICIENT EVIDENCE
+              </span>
+              <span>
+                <span className="font-medium text-muted-foreground">
+                  {consistencyCounts.NOT_CHECKED}
+                </span>{" "}
+                NOT CHECKED
               </span>
             </div>
           )}
@@ -816,9 +1009,12 @@ export function ChallengeSection({
         {consistencyResults && (
           <ul className="space-y-3">
             {consistencyResults.map((pair, idx) => (
-              <li key={`${pair.pair}-${idx}`} className="contents">
-                {ConsistencyRow({ pair })}
-              </li>
+              <ConsistencyRow
+                key={`${pair.pair}-${idx}`}
+                pair={pair}
+                startupId={startupId}
+                evaluations={consistencyState.evaluations}
+              />
             ))}
           </ul>
         )}

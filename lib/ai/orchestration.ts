@@ -6,6 +6,7 @@ import {
   type ConsistencyPairResult,
 } from "@/lib/ai/consistency";
 import { runBrandCritic, type ChallengeIssue, type CriticContextInput, type CriticDecisionInput } from "@/lib/ai/challenge";
+import type { BrandCheck } from "@/lib/ai/brand-checks";
 import { runStrategyAnalyst, type StrategyContextInput, type StrategyResult } from "@/lib/ai/strategy";
 import { retrieveBrandReferences } from "@/lib/ai/references/retrieval";
 import {
@@ -26,6 +27,7 @@ export type StrategyOrchestrationInput = {
     content: string;
   }>;
   strategicGuidance?: string;
+  founderGuidance?: string;
   workflow?: "strategy" | "revision";
   categories?: readonly BrandDecisionCategory[];
 };
@@ -41,6 +43,7 @@ export type CritiquePipelineResult =
   | {
       ok: true;
       result: {
+        checks: BrandCheck[];
         issues: ChallengeIssue[];
         evaluations: BrandEvaluation[];
         evaluationError: string | null;
@@ -144,6 +147,7 @@ const strategyGeneration = RunnableLambda.from(
       input.existingActive,
       input.strategicGuidance,
       input.grounding.content,
+      input.founderGuidance,
     ),
 );
 
@@ -210,7 +214,11 @@ const criticRun = RunnableLambda.from(
         }),
       );
     }
-    return { ok: true as const, result: { issues: critic.result.issues, ...state }, decisions: input };
+    return {
+      ok: true as const,
+      result: { checks: critic.result.checks, issues: critic.result.issues, ...state },
+      decisions: input,
+    };
   },
 );
 
@@ -242,7 +250,9 @@ const consistencyRun = RunnableLambda.from(
       evaluationError: null,
       referenceIds: input.grounding.referenceIds,
     };
-    for (const pair of consistency.result.pair_results.filter((result) => result.result !== "PASS").slice(0, 4)) {
+    for (const pair of consistency.result.pair_results
+      .filter((result) => result.result === "NEEDS_REVIEW" || result.result === "INSUFFICIENT_EVIDENCE")
+      .slice(0, 4)) {
       const categories = PAIR_CATEGORIES.find(([name]) => name === pair.pair)?.[1] ?? [];
       const related = categories.flatMap((category) => byCategory.get(category) ?? []).slice(0, 6);
       const target = related[0];

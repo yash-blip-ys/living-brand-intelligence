@@ -24,6 +24,36 @@ const CATEGORIES: BrandDecisionCategory[] = [
   "LAUNCH",
 ];
 
+function resolveMaxOutputTokens(): number {
+  const raw = Number(process.env.STRATEGY_MAX_OUTPUT_TOKENS);
+  if (Number.isFinite(raw) && raw >= 2048 && raw <= 32768) {
+    return Math.floor(raw);
+  }
+  return 8192;
+}
+
+const GEMINI_RESPONSE_SCHEMA: Json = {
+  type: "OBJECT",
+  properties: {
+    decisions: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: {
+          category: { type: "STRING", enum: [...CATEGORIES] },
+          title: { type: "STRING" },
+          content: { type: "STRING" },
+          rationale: { type: "STRING" },
+          supporting_context_ids: { type: "ARRAY", items: { type: "STRING" } },
+          uncertainty: { type: "STRING" },
+        },
+        required: ["category", "title", "content", "rationale", "supporting_context_ids"],
+      },
+    },
+  },
+  required: ["decisions"],
+};
+
 export type StrategyContextInput = {
   id: string;
   type: ContextItemType;
@@ -50,14 +80,14 @@ type StrategyResultDto = {
 
 const JSON_START_RE = /^[\s\uFEFF\u200B]*\{/;
 const JSON_END_RE = /\}[\s\uFEFF\u200B]*$/;
+const CODE_FENCE_RE = /^```(?:json)?\s*([\s\S]*?)\s*```$/i;
 
-function findJson(text: string): string | null {
+function extractJsonObject(text: string): string | null {
   const trimmed = text.trim();
-  if (JSON_START_RE.test(trimmed) && JSON_END_RE.test(trimmed)) return trimmed;
-  const first = trimmed.indexOf("{");
-  const last = trimmed.lastIndexOf("}");
-  if (first === -1 || last === -1 || last <= first) return null;
-  return trimmed.slice(first, last + 1);
+  const fenced = trimmed.match(CODE_FENCE_RE);
+  const candidate = (fenced?.[1] ?? trimmed).trim();
+  if (JSON_START_RE.test(candidate) && JSON_END_RE.test(candidate)) return candidate;
+  return null;
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -272,16 +302,25 @@ export function validateStrategyResponse(
   }
 
   const dto = raw as StrategyResultDto;
-  const decisionsArr = Array.isArray(dto.decisions) ? dto.decisions : [];
+  const decisionsArr: unknown[] = Array.isArray(dto.decisions) ? dto.decisions : [];
+  const hasDecisionsArray = Array.isArray(dto.decisions);
   const decisions: ProposedStrategyDecision[] = [];
+  const rejected: string[] = [];
 
   const seenKeys = new Set<string>();
 
-  for (const d of decisionsArr) {
-    if (!isRecord(d)) continue;
+  for (const [index, d] of decisionsArr.entries()) {
+    const entry = `entry ${index + 1}`;
+    if (!isRecord(d)) {
+      rejected.push(`${entry} is not a JSON object`);
+      continue;
+    }
 
     const category = normalizeCategory(d.category);
-    if (!category) continue;
+    if (!category) {
+      rejected.push(`${entry} has an unsupported category`);
+      continue;
+    }
 
     const title =
       typeof d.title === "string" ? d.title.trim().slice(0, 160) : "";
@@ -290,13 +329,26 @@ export function validateStrategyResponse(
     const rationale =
       typeof d.rationale === "string" ? d.rationale.trim().slice(0, 2500) : "";
 
-    if (!title || !content || !rationale) continue;
+    const missing = [
+      !title ? "title" : null,
+      !content ? "content" : null,
+      !rationale ? "rationale" : null,
+    ].filter((field): field is string => field !== null);
+    if (missing.length > 0) {
+      rejected.push(`${entry} (${category}) is missing ${missing.join(", ")}`);
+      continue;
+    }
 
     const supporting_context_ids = normalizeStringList(
       d.supporting_context_ids,
       allowedContextIds,
     );
-    if (supporting_context_ids.length === 0) continue;
+    if (supporting_context_ids.length === 0) {
+      rejected.push(
+        `${entry} (${category}) has no supporting_context_id from the approved Discovery context`,
+      );
+      continue;
+    }
 
     const uncertaintyRaw = d.uncertainty;
     const uncertainty =
@@ -320,13 +372,28 @@ export function validateStrategyResponse(
     if (decisions.length >= 40) break;
   }
 
-  if (decisions.length === 0) {
+  if (rejected.length > 0) {
     return {
       ok: false,
       err: {
         kind: "parse",
         message:
-          "The model returned an empty or unusable strategy result. Ensure there is enough approved context and try again.",
+          `The model returned ${decisions.length} usable decision(s) and ${rejected.length} entry/entries that failed schema validation: ` +
+          `${rejected.slice(0, 4).join("; ")}. No decision was accepted. ` +
+          "Every decision needs a supported category, title, content, rationale, and at least one approved Discovery supporting_context_id.",
+        raw,
+      },
+    };
+  }
+
+  if (decisions.length === 0) {
+    return {
+      ok: false,
+      err: {
+        kind: "parse",
+        message: hasDecisionsArray
+          ? "The model returned a decisions array with no usable entries. Ensure there is enough approved Discovery context and regenerate."
+          : "The model returned JSON without a decisions array. The response did not match the required strategy schema.",
         raw,
       },
     };
@@ -347,6 +414,7 @@ export async function runStrategyAnalyst(
   }>,
   strategicGuidance?: string,
   methodologyReferences?: string,
+  founderGuidance?: string,
 ): Promise<{ ok: true; result: StrategyResult } | { ok: false; err: DiscoveryError }> {
   if (approvedContext.length === 0) {
     return {
@@ -368,6 +436,7 @@ export async function runStrategyAnalyst(
   }
 
   const { cfg } = cfgRes;
+  const maxOutputTokens = resolveMaxOutputTokens();
 
   const allowedIds = new Set(approvedContext.map((c) => c.id));
 
@@ -388,6 +457,20 @@ export async function runStrategyAnalyst(
       `- [${d.category}] ${d.title} — ${d.content.replace(/\s+/g, " ").trim()}`,
     );
   }
+
+  const founderBlock = founderGuidance?.trim()
+    ? `
+FOUNDER BRAND DIRECTION (stated by the founder before generation; binding constraints, not evidence):
+"""
+${founderGuidance.trim()}
+"""
+
+Honour this direction. It is the founder's own strategic intent, not a discovered fact,
+so never cite it in supporting_context_ids and never present it as discovered knowledge.
+It must never override the founder's approved context, and it must never narrow the
+startup to a use case, segment, or market the founder did not choose.
+`
+    : "";
 
   const guidanceBlock = strategicGuidance?.trim()
     ? `
@@ -427,6 +510,7 @@ ${ctxLines.join("\n")}
 EXISTING ACTIVE BRAND DECISIONS (avoid duplicating; if you propose something superseding one of these, still propose a new decision and the UI will handle the transition):
 ${existingLines.length > 0 ? existingLines.join("\n") : "(none yet)"}
 
+${founderBlock}
 ${methodologyBlock}
 ${guidanceBlock}
 
@@ -452,7 +536,7 @@ Remember:
     };
     body = {
       model: cfg.model,
-      max_tokens: 3600,
+      max_tokens: maxOutputTokens,
       system: SYSTEM_PROMPT,
       messages: [
         { role: "user", content: [{ type: "text", text: userPrompt }] },
@@ -475,8 +559,9 @@ Remember:
       ],
       generationConfig: {
         temperature: 0.2,
-        maxOutputTokens: 3600,
+        maxOutputTokens,
         responseMimeType: "application/json",
+        responseSchema: GEMINI_RESPONSE_SCHEMA,
       },
     };
   } else {
@@ -553,6 +638,7 @@ Remember:
   }
 
   let contentText = "";
+  let geminiFinishReason: string | null = null;
   try {
     if (cfg.provider === "anthropic") {
       const bodyAny = json as Record<string, unknown>;
@@ -566,6 +652,9 @@ Remember:
       const candidates = bodyAny.candidates;
       if (Array.isArray(candidates) && candidates.length > 0 && isRecord(candidates[0])) {
         const c0 = candidates[0] as Record<string, unknown>;
+        if (typeof c0.finishReason === "string") {
+          geminiFinishReason = c0.finishReason;
+        }
         const content = c0.content;
         if (isRecord(content)) {
           const parts = (content as Record<string, unknown>).parts;
@@ -614,25 +703,41 @@ Remember:
     /* contentText stays empty */
   }
 
+  if (geminiFinishReason === "MAX_TOKENS") {
+    return {
+      ok: false,
+      err: {
+        kind: "parse",
+        message:
+          `Gemini stopped at the ${maxOutputTokens}-token output limit before completing the strategy JSON. ` +
+          "The strategy schema is too large for the current limit. Raise STRATEGY_MAX_OUTPUT_TOKENS (up to 32768) and regenerate.",
+        raw: contentText.slice(-1500),
+      },
+    };
+  }
+
   if (!contentText) {
     return {
       ok: false,
       err: {
         kind: "parse",
-        message: "AI response did not contain message content.",
+        message:
+          geminiFinishReason && geminiFinishReason !== "STOP"
+            ? `Gemini produced no strategy content. Finish reason: ${geminiFinishReason}.`
+            : "AI response did not contain message content.",
         raw: json,
       },
     };
   }
 
-  const jsonStr = findJson(contentText);
+  const jsonStr = extractJsonObject(contentText);
   if (!jsonStr) {
     return {
       ok: false,
       err: {
         kind: "parse",
         message:
-          "AI response could not be parsed as structured strategy JSON output.",
+          "The strategy response was not a single JSON object. Return only the required strategy JSON object without surrounding commentary.",
         raw: contentText.slice(0, 1500),
       },
     };
@@ -641,12 +746,13 @@ Remember:
   let parsed: unknown;
   try {
     parsed = JSON.parse(jsonStr);
-  } catch {
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : "unknown parse error";
     return {
       ok: false,
       err: {
         kind: "parse",
-        message: "AI response was not valid JSON.",
+        message: `The strategy JSON is malformed: ${reason}.`,
         raw: jsonStr.slice(0, 1500),
       },
     };

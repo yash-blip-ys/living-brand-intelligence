@@ -1,4 +1,9 @@
 import { createClient } from "@/lib/server";
+import {
+  IMPACT_TYPES,
+  toImpactType,
+  type ImpactType,
+} from "@/lib/types/impact-types";
 import type {
   ChangeAnalysis,
   ChangeAnalysisImpact,
@@ -26,6 +31,12 @@ export type NewFounderFactInput = {
   confidence?: number | null;
 };
 
+export {
+  IMPACT_TYPES,
+  toImpactType,
+  type ImpactType,
+} from "@/lib/types/impact-types";
+
 export async function createFounderFact(
   input: NewFounderFactInput,
 ): Promise<ContextItem> {
@@ -42,7 +53,13 @@ export async function createFounderFact(
     confidence: input.confidence ?? 1.0,
     supersedes_id: null,
     rejection_reason: null,
-    metadata: null,
+    // context_items.metadata is NOT NULL. Founder facts use the same shape
+    // Discovery writes, so every context item carries a metadata object.
+    metadata: {
+      reasoning: null,
+      fromRoughIdea: null,
+      sourceDiscovery: "v1",
+    },
   };
 
   const supabase = await createClient();
@@ -92,7 +109,7 @@ export type NewChangeAnalysisInput = {
 
 export type NewImpactInput = {
   brand_decision_id: string;
-  impact_type: string;
+  impact_type: ImpactType;
   severity: ImpactSeverity;
   reason: string;
 };
@@ -109,6 +126,21 @@ export async function createChangeAnalysis(
     throw new Error("Source context item ID is required.");
   const summary = input.summary.trim();
   if (!summary) throw new Error("Change analysis summary is required.");
+
+  // Validate every impact BEFORE writing anything: the impact check constraint
+  // can only fail the insert, and without DELETE permission on
+  // change_analysis_impacts a failed insert would strand a committed analysis
+  // with no impacts.
+  impacts.forEach((imp, index) => {
+    if (!imp.brand_decision_id) {
+      throw new Error(`Impact ${index + 1} is missing a brand decision.`);
+    }
+    if (toImpactType(imp.impact_type) === null) {
+      throw new Error(
+        `Impact ${index + 1} has an unsupported impact type "${imp.impact_type}". Expected one of: ${IMPACT_TYPES.join(", ")}.`,
+      );
+    }
+  });
 
   const supabase = await createClient();
 

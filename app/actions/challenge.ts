@@ -12,6 +12,7 @@ import {
   type NewDecisionContextLinkInput,
 } from "@/lib/db/brand-decisions";
 import type { ChallengeIssue } from "@/lib/ai/challenge";
+import type { BrandCheck } from "@/lib/ai/brand-checks";
 import { type ConsistencyPairResult } from "@/lib/ai/consistency";
 import {
   orchestrateConsistency,
@@ -32,6 +33,8 @@ export type ChallengeCritiqueState = {
   error?: string;
   configError?: boolean;
   issues?: ChallengeIssue[] | null;
+  /** Full five-check result, including PASS and INSUFFICIENT_EVIDENCE. */
+  checks?: BrandCheck[] | null;
   evaluations?: BrandEvaluation[] | null;
   evaluationError?: string | null;
   referenceIds?: string[];
@@ -57,6 +60,48 @@ export type ChallengeDismissState = {
 };
 
 export type ChallengeReviseState = StrategyActionState;
+
+/**
+ * Applies the alternative the critic already wrote, with no second model call.
+ * It becomes a proposed draft like any other revision, so the founder still
+ * approves it explicitly in the Brand tab — nothing is written silently.
+ */
+export async function useChallengeAlternative(
+  _state: StrategyActionState | undefined,
+  formData: FormData,
+): Promise<StrategyActionState> {
+  const startupId = formData.get("startupId")?.toString() ?? "";
+  const decisionId = formData.get("decisionId")?.toString() ?? "";
+  const categoryRaw = formData.get("category")?.toString() ?? "";
+  const alternative = formData.get("alternative")?.toString() ?? "";
+  if (!startupId || !decisionId || !categoryRaw || !alternative.trim()) {
+    return { error: "Startup ID, decision, category, and alternative are required." };
+  }
+  let decisions: BrandDecision[] = [];
+  try {
+    decisions = await getBrandDecisions(startupId);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Could not load decisions.";
+    return { error: message };
+  }
+  const target = decisions.find((d) => d.id === decisionId);
+  if (!target) return { error: "The challenged decision no longer exists." };
+
+  const draft: ProposedDecisionDraft = {
+    tempId: `alt_${Date.now().toString(36)}`,
+    category: (categoryRaw.toUpperCase() as BrandDecisionCategory) ?? target.category,
+    title: target.title,
+    content: alternative.trim(),
+    rationale:
+      "Applied the Brand Critic's proposed alternative. Review the wording before approving.",
+    supporting_context_ids: [],
+    uncertainty: "Written by the Brand Critic, not regenerated from Discovery context.",
+    persisted: false,
+    persistedId: null,
+    state: "proposed",
+  };
+  return { proposed: [draft] };
+}
 
 const EMPTY_CRITIQUE: ChallengeCritiqueState = {};
 const EMPTY_DISMISS: ChallengeDismissState = {};
@@ -192,6 +237,7 @@ export async function runChallengeCritique(
   }
   return {
     issues: res.result.issues,
+    checks: res.result.checks,
     evaluations: res.result.evaluations,
     evaluationError: res.result.evaluationError,
     referenceIds: res.result.referenceIds,

@@ -1,6 +1,11 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import {
+  useStageProgress,
+  type StageCompletion,
+  type StageKey,
+} from "@/app/components/stage-progress";
 
 export type WorkspaceTabKey =
   | "overview"
@@ -10,62 +15,114 @@ export type WorkspaceTabKey =
   | "deliver"
   | "evolution";
 
-const TABS: Array<{ key: WorkspaceTabKey; label: string; hint: string }> = [
-  { key: "overview", label: "Overview", hint: "Read-only summary" },
-  { key: "discovery", label: "Discover", hint: "Facts · Inferences · Hypotheses" },
-  { key: "strategy", label: "Brand", hint: "Active brand system" },
-  { key: "challenge", label: "Challenge", hint: "Critique · Consistency" },
-  { key: "deliver", label: "Deliver", hint: "Export brand kit" },
-  { key: "evolution", label: "Evolution", hint: "Detect drift & adapt" },
+export type { StageKey };
+
+const STAGES: Array<{ key: StageKey; label: string; hint: string }> = [
+  { key: "discovery", label: "Discover", hint: "Understand the startup" },
+  { key: "strategy", label: "Brand", hint: "Make strategic decisions" },
+  { key: "challenge", label: "Challenge", hint: "Stress-test the brand" },
+  { key: "deliver", label: "Deliver", hint: "Package the system" },
+  { key: "evolution", label: "Evolution", hint: "Adapt when reality changes" },
 ];
 
 export function WorkspaceTabs({
   defaultTab,
   slots,
+  completed: completedProp = {},
 }: {
   defaultTab?: WorkspaceTabKey;
   slots: Record<WorkspaceTabKey, ReactNode>;
+  /** Which stages already have founder-approved output behind them. */
+  completed?: StageCompletion;
 }) {
   const [tab, setTab] = useState<WorkspaceTabKey>(defaultTab ?? "overview");
+  // The prop seeds the stages backed by persisted work; the shared signal
+  // carries stages whose completion is an event, so both read one state.
+  const { completed: progressCompleted } = useStageProgress();
+  const completed: StageCompletion = { ...completedProp, ...progressCompleted };
+
+  const activeStage: StageKey =
+    tab === "overview" ? "discovery" : (tab as StageKey);
+  const stagesDone = STAGES.filter((s) => completed[s.key]).length;
+  const currentIndex = STAGES.findIndex((s) => s.key === activeStage);
+
+  const statusFor = (index: number, key: StageKey) => {
+    if (completed[key]) return "done" as const;
+    if (index === currentIndex) return "current" as const;
+    return "upcoming" as const;
+  };
 
   return (
     <div className="space-y-8">
-      <nav className="rounded-full border border-border bg-card/60 p-1 flex flex-wrap gap-1">
-        {TABS.map((t) => {
-          const active = tab === t.key;
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => setTab("overview")}
+          className={`text-sm transition-colors ${
+            tab === "overview"
+              ? "text-foreground font-medium"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Overview
+        </button>
+        <span className="text-sm text-muted-foreground">
+          Stage {Math.min(currentIndex + 1, STAGES.length)} of {STAGES.length} ·{" "}
+          {stagesDone} complete
+        </span>
+      </div>
+
+      <nav className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3" aria-label="Workspace stages">
+        {STAGES.map((stage, index) => {
+          const status = statusFor(index, stage.key);
+          const active = tab === stage.key;
+          const marker =
+            status === "done" ? "✓" : status === "current" ? "●" : "○";
           return (
             <button
               type="button"
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={`flex-1 min-w-[120px] flex items-center justify-center flex-col rounded-full px-3 py-2 text-left sm:px-4 sm:py-2.5 transition-colors ${
+              key={stage.key}
+              onClick={() => setTab(stage.key)}
+              aria-current={active ? "step" : undefined}
+              className={`group flex flex-col items-start gap-1 rounded-2xl border px-4 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 ${
                 active
-                  ? "bg-foreground text-background"
-                  : "hover:bg-muted/40 text-muted-foreground"
+                  ? "border-foreground bg-foreground text-background"
+                  : status === "current"
+                    ? "border-foreground/40 bg-card hover:border-foreground/70"
+                    : "border-border bg-card/60 hover:border-foreground/30"
               }`}
             >
               <span
-                className={`text-[11px] sm:text-xs font-medium tracking-tight ${active ? "text-background" : "text-foreground/90"}`}
+                className={`flex items-center gap-2 text-xs font-medium uppercase tracking-wider ${
+                  active ? "text-background/80" : "text-muted-foreground"
+                }`}
               >
-                {t.label}
+                <span aria-hidden>{marker}</span>
+                0{index + 1}
               </span>
               <span
-                className={`text-[9px] sm:text-[10px] uppercase tracking-[0.18em] ${active ? "text-background/70" : "text-muted-foreground"}`}
+                className={`text-[17px] font-semibold tracking-tight ${
+                  active ? "text-background" : "text-foreground"
+                }`}
               >
-                {t.hint}
+                {stage.label}
+              </span>
+              <span
+                className={`text-sm leading-snug ${
+                  active ? "text-background/70" : "text-muted-foreground"
+                }`}
+              >
+                {stage.hint}
               </span>
             </button>
           );
         })}
       </nav>
+
       <div className="min-h-[60vh]">
-        {TABS.map((t) => (
-          <div
-            key={t.key}
-            hidden={tab !== t.key}
-            className={`${tab === t.key ? "block" : "hidden"}`}
-          >
-            {slots[t.key]}
+        {(["overview", ...STAGES.map((s) => s.key)] as WorkspaceTabKey[]).map((key) => (
+          <div key={key} hidden={tab !== key}>
+            {slots[key]}
           </div>
         ))}
       </div>

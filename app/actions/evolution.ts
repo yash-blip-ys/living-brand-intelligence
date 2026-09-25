@@ -8,6 +8,8 @@ import {
   getChangeAnalyses,
   getChangeAnalysisImpacts,
   setChangeAnalysisStatus,
+  toImpactType,
+  type ImpactType,
   type NewImpactInput,
 } from "@/lib/db/evolution";
 import {
@@ -49,7 +51,14 @@ export type ChangeImpactDraft = {
   decision_content: string;
   decision_rationale: string | null;
   decision_supporting_context_ids: string[];
-  impact_type: string;
+  /**
+   * Value stored in `change_analysis_impacts.impact_type`: the brand decision
+   * category this impact lands on, which is what that column's check
+   * constraint allows. See `toImpactType`.
+   */
+  impact_type: ImpactType;
+  /** The kind of drift the analyst detected, kept for display and context. */
+  drift_type?: string;
   severity: ImpactSeverity;
   reason: string;
   needs_review: boolean;
@@ -99,6 +108,10 @@ function impactsFromAi(
   for (const imp of result.impacts) {
     const d = decisionsById.get(imp.brand_decision_id);
     if (!d) continue;
+    // The persisted impact_type is the impacted decision's category; the
+    // analyst's own drift classification is kept alongside it.
+    const impactType = toImpactType(d.category);
+    if (!impactType) continue;
     seq += 1;
     const supporting = linksByDecision.get(d.id) ?? [];
     const aiImp = imp as ProposedImpact;
@@ -110,7 +123,8 @@ function impactsFromAi(
       decision_content: d.content,
       decision_rationale: d.rationale,
       decision_supporting_context_ids: supporting,
-      impact_type: imp.impact_type,
+      impact_type: impactType,
+      drift_type: imp.impact_type,
       severity: imp.severity,
       reason: imp.reason,
       needs_review: aiImp.needs_review,
@@ -120,6 +134,37 @@ function impactsFromAi(
     });
   }
   return out;
+}
+
+/**
+ * Maps draft impacts to insertable rows. `impact_type` is normalised to the
+ * decision category the column's check constraint allows, so a stale or
+ * tampered payload is rejected before anything is written instead of failing
+ * mid-insert and stranding a committed analysis row.
+ */
+function impactRowsFromDrafts(impacts: readonly ChangeImpactDraft[]): {
+  rows: NewImpactInput[];
+  invalid: string | null;
+} {
+  const rows: NewImpactInput[] = [];
+  for (const [index, i] of impacts.entries()) {
+    const impactType =
+      toImpactType(i.impact_type) ?? toImpactType(i.decision_category);
+    if (!impactType) {
+      const label = i.decision_title || `decision ${index + 1}`;
+      return {
+        rows: [],
+        invalid: `Cannot record the impact on "${label}": its category is not a supported impact type.`,
+      };
+    }
+    rows.push({
+      brand_decision_id: i.brand_decision_id,
+      impact_type: impactType,
+      severity: i.severity,
+      reason: i.reason,
+    });
+  }
+  return { rows, invalid: null };
 }
 
 export async function addFounderContext(
@@ -357,12 +402,9 @@ export async function approveRevisionForAnalysis(
       const a = await setChangeAnalysisStatus(persistedId, "approved");
       finalAnalysisId = a.id;
     } else {
-      const impactInput: NewImpactInput[] = impacts.map((i) => ({
-        brand_decision_id: i.brand_decision_id,
-        impact_type: i.impact_type,
-        severity: i.severity,
-        reason: i.reason,
-      }));
+      const { rows: impactInput, invalid: invalidImpactType } =
+        impactRowsFromDrafts(impacts);
+      if (invalidImpactType) return { error: invalidImpactType };
 
       const { analysis } = await createChangeAnalysis(
         {
@@ -469,12 +511,9 @@ export async function keepCurrentForAnalysis(
       const a = await setChangeAnalysisStatus(persistedId, "ignored");
       finalAnalysisId = a.id;
     } else {
-      const impactInput: NewImpactInput[] = impacts.map((i) => ({
-        brand_decision_id: i.brand_decision_id,
-        impact_type: i.impact_type,
-        severity: i.severity,
-        reason: i.reason,
-      }));
+      const { rows: impactInput, invalid: invalidImpactType } =
+        impactRowsFromDrafts(impacts);
+      if (invalidImpactType) return { error: invalidImpactType };
       const { analysis } = await createChangeAnalysis(
         {
           startup_id: startupId,
@@ -526,12 +565,9 @@ export async function rejectAnalysis(
       const a = await setChangeAnalysisStatus(persistedId, "rejected");
       finalAnalysisId = a.id;
     } else {
-      const impactInput: NewImpactInput[] = impacts.map((i) => ({
-        brand_decision_id: i.brand_decision_id,
-        impact_type: i.impact_type,
-        severity: i.severity,
-        reason: i.reason,
-      }));
+      const { rows: impactInput, invalid: invalidImpactType } =
+        impactRowsFromDrafts(impacts);
+      if (invalidImpactType) return { error: invalidImpactType };
       const { analysis } = await createChangeAnalysis(
         {
           startup_id: startupId,

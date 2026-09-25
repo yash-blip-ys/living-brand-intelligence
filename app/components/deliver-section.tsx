@@ -1,8 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useQualityRuns, useStageProgress } from "@/app/components/stage-progress";
 import type { BrandDecision, BrandDecisionCategory, ContextItem } from "@/lib/types/database";
 import type { DecisionContextSupport } from "@/lib/db/brand-decisions";
+import { resolveContextRefs } from "@/lib/context-refs";
 
 type Props = {
   startupName: string;
@@ -185,8 +187,13 @@ export function DeliverSection({
   approvedContext,
 }: Props) {
   void decisionLinks;
-  void approvedContext;
   const [copiedMap, doCopy] = useCopy();
+
+  const contextById = useMemo(() => {
+    const m = new Map<string, ContextItem>();
+    for (const c of approvedContext) m.set(c.id, c);
+    return m;
+  }, [approvedContext]);
 
   const activeOnly = useMemo(
     () => activeDecisions.filter((d) => d.status === "active"),
@@ -372,8 +379,19 @@ export function DeliverSection({
 
   const copiedMd = copiedMap.get("md") ?? false;
   const copiedJson = copiedMap.get("json") ?? false;
-  const clipboardUnavailable =
-    typeof navigator === "undefined" || !navigator.clipboard;
+  /* Derived only from the approved-decision prop so server and client render the
+     same markup. Clipboard availability is handled in the copy handler, never here. */
+  const canExport = activeOnly.length > 0;
+  // Deliver is complete when the kit itself is valid and renderable — the same
+  // condition that enables the exports and clears the empty-kit warning. It is
+  // not tied to opening the tab, and a kit that cannot be built stays
+  // incomplete.
+  const { markCompleted } = useStageProgress();
+  useEffect(() => {
+    if (canExport) markCompleted("deliver");
+  }, [canExport, markCompleted]);
+  // Quality cards report the real Challenge-tab runs when they have happened.
+  const { challengeRun, consistencyRun } = useQualityRuns();
 
   return (
     <section className="space-y-8">
@@ -423,7 +441,7 @@ export function DeliverSection({
             <button
               type="button"
               onClick={() => doCopy("md", buildMarkdown)}
-              disabled={clipboardUnavailable}
+              disabled={!canExport}
               className="inline-flex h-10 items-center justify-center rounded-full border border-foreground bg-foreground px-5 text-xs font-medium text-background hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
             >
               {copiedMd ? "Markdown copied" : "Copy Brand Kit (Markdown)"}
@@ -431,7 +449,7 @@ export function DeliverSection({
             <button
               type="button"
               onClick={() => doCopy("json", buildJson)}
-              disabled={clipboardUnavailable}
+              disabled={!canExport}
               className="inline-flex h-10 items-center justify-center rounded-full border border-border bg-transparent px-5 text-xs font-medium text-foreground hover:bg-muted/40 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               {copiedJson ? "JSON copied" : "Copy Brand Kit (JSON)"}
@@ -439,10 +457,10 @@ export function DeliverSection({
           </div>
         </div>
 
-        {clipboardUnavailable && (
-          <div className="rounded-xl border border-amber-600/40 bg-amber-500/[0.04] p-4 text-xs text-amber-700 dark:text-amber-300 space-y-2">
-            Clipboard API unavailable in this environment. Export not possible until
-            you test in a real browser.
+        {!canExport && (
+          <div className="rounded-xl border border-amber-600/40 bg-amber-500/[0.04] p-4 text-sm text-amber-700 dark:text-amber-300 space-y-2">
+            There are no approved decisions yet, so there is nothing to export. Approve
+            a decision in the Brand tab first.
           </div>
         )}
       </div>
@@ -479,7 +497,7 @@ export function DeliverSection({
               {aud?.rationale && (
                 <div className="text-[11px] leading-relaxed text-muted-foreground whitespace-pre-wrap border-l-2 border-border pl-2.5 mt-3">
                   <span className="uppercase tracking-[0.18em] mr-1.5 text-[9px]">Why</span>
-                  {aud.rationale}
+                  {resolveContextRefs(aud.rationale, contextById)}
                 </div>
               )}
             </div>
@@ -810,24 +828,105 @@ export function DeliverSection({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
             <div className="rounded-xl border border-border p-5 space-y-2 bg-background/60">
               <SubHeading>Challenge results</SubHeading>
-              <p className="text-sm text-muted-foreground">
-                Run the Challenge tab to surface defects. During the live demo these
-                counters will show real counts.
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Status:{" "}
-                <span className="uppercase tracking-[0.18em]">Not run yet</span>
-              </p>
+              {challengeRun === null ? (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    Run the Challenge tab to surface defects.
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Status:{" "}
+                    <span className="uppercase tracking-[0.18em]">Not run yet</span>
+                  </p>
+                </>
+              ) : challengeRun.status === "error" ? (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    The last Challenge run did not complete, so no result was recorded.
+                  </p>
+                  {challengeRun.error && (
+                    <p className="text-xs text-muted-foreground whitespace-pre-wrap">
+                      {challengeRun.error}
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Status:{" "}
+                    <span className="uppercase tracking-[0.18em]">Unavailable</span>
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    {challengeRun.issueCount === 0
+                      ? `No issues found across ${challengeRun.checksRun} reported check${
+                          challengeRun.checksRun === 1 ? "" : "s"
+                        }.`
+                      : `${challengeRun.issueCount} issue${
+                          challengeRun.issueCount === 1 ? "" : "s"
+                        } needing review — ${challengeRun.high} high, ${challengeRun.medium} medium, ${challengeRun.low} low.`}
+                  </p>
+                  {challengeRun.ungrounded > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      {challengeRun.ungrounded} check
+                      {challengeRun.ungrounded === 1 ? "" : "s"} could not be grounded, so
+                      no verdict was reported for{" "}
+                      {challengeRun.ungrounded === 1 ? "it" : "them"}.
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Status:{" "}
+                    <span className="uppercase tracking-[0.18em]">
+                      {challengeRun.issueCount === 0 ? "Complete · 0 issues" : "Complete"}
+                    </span>
+                  </p>
+                </>
+              )}
             </div>
             <div className="rounded-xl border border-border p-5 space-y-2 bg-background/60">
               <SubHeading>Consistency</SubHeading>
-              <p className="text-sm text-muted-foreground">
-                9 pairs. Run Consistency Guardian in the Challenge tab.
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Status:{" "}
-                <span className="uppercase tracking-[0.18em]">Not run yet</span>
-              </p>
+              {consistencyRun === null ? (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    Run Consistency Guardian in the Challenge tab.
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Status:{" "}
+                    <span className="uppercase tracking-[0.18em]">Not run yet</span>
+                  </p>
+                </>
+              ) : consistencyRun.status === "error" ? (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    The last Consistency run did not complete, so no result was recorded.
+                  </p>
+                  {consistencyRun.error && (
+                    <p className="text-xs text-muted-foreground whitespace-pre-wrap">
+                      {consistencyRun.error}
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Status:{" "}
+                    <span className="uppercase tracking-[0.18em]">Unavailable</span>
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    {consistencyRun.total} decision pair
+                    {consistencyRun.total === 1 ? "" : "s"} checked —{" "}
+                    {consistencyRun.pass} pass, {consistencyRun.needsReview} need
+                    {consistencyRun.needsReview === 1 ? "s" : ""} review,{" "}
+                    {consistencyRun.insufficientEvidence} with insufficient evidence
+                    {consistencyRun.notChecked > 0
+                      ? `, ${consistencyRun.notChecked} not checkable`
+                      : ""}
+                    .
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Status:{" "}
+                    <span className="uppercase tracking-[0.18em]">Complete</span>
+                  </p>
+                </>
+              )}
             </div>
             <div className="rounded-xl border border-border p-5 space-y-2 bg-background/60">
               <SubHeading>Unresolved warnings</SubHeading>

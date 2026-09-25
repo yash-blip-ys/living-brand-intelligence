@@ -3,10 +3,21 @@ import {
   resolveAiConfig,
   type DiscoveryError,
 } from "@/lib/ai/discovery";
+import {
+  checkLabel,
+  checkSeverity,
+  needsReviewChecks,
+  normalizeBrandChecks,
+  type BrandCheck,
+  type CheckStatus,
+  type CheckType,
+} from "@/lib/ai/brand-checks";
 
 export type ChallengeIssue = {
   id: string;
   severity: "high" | "medium" | "low";
+  check_type: CheckType;
+  status: CheckStatus;
   affected_decision_id: string;
   affected_category: BrandDecisionCategory;
   issue_title: string;
@@ -30,8 +41,11 @@ export type CriticDecisionInput = {
   supporting_context_ids: string[];
 };
 
-type CriticResultRaw = {
-  issues?: unknown[];
+export type CriticResult = {
+  /** Full five-check result set, including PASS and INSUFFICIENT_EVIDENCE. */
+  checks: BrandCheck[];
+  /** Legacy projection: only the reviewable findings, for the existing UI. */
+  issues: ChallengeIssue[];
 };
 
 const JSON_START_RE = /^[\s\uFEFF\u200B]*\{/;
@@ -64,64 +78,72 @@ const CATEGORIES: BrandDecisionCategory[] = [
   "LAUNCH",
 ];
 
-const CLICHES = `Banned generic startup clichés to detect and flag:
-- "innovative platform", "seamless experience", "empower users", "user-centric", "leverage AI",
-- "next-generation", "revolutionary", "disruptive", "game-changing", "cutting-edge",
-- "end-to-end solution", "one-stop shop", "holistic approach", "drive growth",
-- "unlock potential", "streamline workflows", "actionable insights", "robust",
-- "scalable", "world-class", "best-in-class", "mission-critical"`;
+const CLICHES = `Common brand language that carries no information. Flag it ONLY when the decision has nothing specific to replace it:
+- "empowering the next generation", "innovative solutions", "innovative platform", "empower users"
+- "next-generation", "revolutionary", "game-changing", "cutting-edge", "best-in-class", "world-class"
+- "unlock potential", "seamless experience", "end-to-end solution", "one-stop shop", "holistic approach"
+- "actionable insights", "user-centric", "the most trusted", "the easiest way to", "shaping the future"
+- "transforming the way people work", "the world's leading", "seamless", "scalable", "robust"`;
 
-const DETECTORS = `8 detectors to apply:
-1. CLICHÉS / GENERIC LANGUAGE: contains any phrase from the banned clichés list, or language that applies equally well to thousands of unrelated startups (e.g., describing software as "user-friendly" with no specifics).
-2. WEAK DIFFERENTIATION: position/differentiation decision could describe literally any category participant — reader cannot tell the startup apart from alternatives.
-3. UNSUPPORTED CLAIMS: decision states facts or numbers or market conclusions not supported by any supporting_context_ids, or cited context items are all HYPOTHESIS with no FACT backing.
-4. AUDIENCE MISMATCH: PERSONALITY / VOICE / MESSAGING decision's tone, vocabulary, references or implied-values directly contradict the AUDIENCE decision's documented who-they-are / what-they-care-about.
-5. CONTRADICTIONS: two active decisions directly conflict on the same dimension (e.g., NAMING playful but VOICE says "formal and never casual").
-6. BIAS / EXCLUSION: language that ungroundedly assumes a demographic, gender, geography, ability, culture, or socio-economic status; excludes reasonable user segments without justification; coded dog-whistles.
-7. WEAK NAMING: names / territories are generic dictionary words in an overcrowded space, hard to pronounce, hard to spell, easily confused with existing major brands, zero rationale linking name to the actual startup idea.
-8. VAGUE POSITIONING: POSITIONING uses empty nouns like "the X for Y" without specifying a category or who the alternatives are; no anchor; could mean anything to anyone.`;
+const CHECKS = `Run exactly these five checks over the active brand decisions:
+
+1. "generic" — GENERIC / CLICHÉ LANGUAGE
+   The decision leans on the banned clichés above and, outside those phrases, says nothing a reader could not say about any other product. Specific wording is NOT generic: if the decision names a real audience, a real capability, or a real situation, it passes this check even when one cliché appears inside it.
+
+2. "contradiction" — DIRECT CONTRADICTION
+   Two active decisions state opposite things on the same dimension. Both sides must be quoted. A soft tension, a different emphasis, or a decision that merely fails to mention the other one is NOT a contradiction — use "potential_conflict" for that, and prefer INSUFFICIENT_EVIDENCE when you cannot quote both sides.
+
+3. "bias" — BIAS OR UNGROUNDED FRAMING
+   The decision assumes a demographic, ability, culture, geography, or income level without support, excludes a reasonable user segment with no stated reason, or uses coded phrasing. If the approved context does not describe who the users are, you cannot decide whether an assumption is warranted: report INSUFFICIENT_EVIDENCE and say what context is missing. Never invent a bias problem to fill the slot.
+
+4. "audience_mismatch" — AUDIENCE MISMATCH
+   A PERSONALITY / VOICE / MESSAGING / TAGLINE decision's vocabulary, tone, references, or implied values do not fit the documented audience. Quote the audience decision and the mismatching wording. Without an active AUDIENCE decision, report INSUFFICIENT_EVIDENCE.
+
+5. "unsupported_claim" — WEAK SPECIFICITY / UNSUPPORTED CLAIM
+   The decision asserts a fact, number, ranking, or market conclusion that no supporting context item backs, or the claim is too vague to check ("the best option for teams"). The most common case is a headline claim like "the most trusted platform" with nothing behind it. Quote the claim and name the context that is missing.`;
 
 const SYSTEM_PROMPT = `You are the Brand Critic — a senior brand editor who finds weak spots before launch.
 
-Your job: audit every active brand decision using the 8 detectors below. For each real defect you find, return a structured issue with severity, evidence, and a concrete rewritten alternative. Be strict but fair — only report defects you can defend with evidence; do not nitpick style.
+You run five checks over already-approved brand decisions. Every check returns exactly one result per relevant decision with:
+- "check_type": "generic" | "contradiction" | "potential_conflict" | "bias" | "audience_mismatch" | "unsupported_claim"
+- "status": "PASS" | "NEEDS_REVIEW" | "INSUFFICIENT_EVIDENCE"
+- "decision_id": EXACT id from the provided active decisions list. Never invent ids.
+- "evidence": array of direct quotes from the decision content (and the other decision, for contradictions) that you relied on. Required for NEEDS_REVIEW.
+- "reason": one or two sentences saying what the quoted wording shows. Required for NEEDS_REVIEW.
+- "alternative": a concrete rewrite of the affected decision content, not advice. Required for NEEDS_REVIEW.
+
+Status rules — these are the whole point of the exercise:
+- PASS: you checked and the wording holds up. Say so in "reason" using the actual wording.
+- NEEDS_REVIEW: a real defect you can defend with quoted evidence. Always include evidence, reason, and alternative.
+- INSUFFICIENT_EVIDENCE: you cannot judge because the decision or the approved context does not say enough. Use this instead of guessing, and name what is missing. This is a legitimate, expected outcome — it is not a failure and not a defect.
+
+Be strict but fair. Report a NEEDS_REVIEW only when you can quote the wording that proves it. When a decision is genuinely good, return PASS for it. Never manufacture a finding to look thorough, and never invent a contradiction you cannot quote from both sides.
 
 ${CLICHES}
 
-${DETECTORS}
+${CHECKS}
 
-You must return ONLY a single valid JSON object:
+Return ONLY a single valid JSON object, no prose and no markdown fence:
 {
-  "issues": [
+  "checks": [
     {
-      "id": "crit_nnnn1",
-      "severity": "high | medium | low",
-      "affected_decision_id": "EXACT id from the provided active decisions list",
-      "affected_category": "ONE of the 11 categories",
-      "issue_title": "Short title, 6-12 words",
-      "issue": "The actual defect. 2-4 sentences, specific and precise. Name which detector triggered.",
-      "evidence": "Quote from the decision content + explain exactly why it's a problem. Ground in supporting context if relevant.",
-      "proposed_alternative": "A concrete REWRITTEN alternative for the affected DECISION CONTENT (not just advice). Use the same ### section structure if the category expects it. Keep length comparable to the original."
+      "id": "chk_0001",
+      "check_type": "generic",
+      "status": "NEEDS_REVIEW",
+      "decision_id": "<exact id>",
+      "evidence": ["<direct quote from the decision>"],
+      "reason": "<what the quote shows>",
+      "alternative": "<full replacement text for that decision's content>"
     }
   ]
 }
 
 Rules:
-- If there are zero genuine defects, return {"issues": []} (empty array is correct and encouraged).
-- Each issue MUST reference an affected_decision_id that exactly matches one id from the provided active decisions list. Never invent decision ids.
-- affected_category MUST be one of the 11 allowed categories.
-- severity = high for: contradictions, unsupported claims that are central to positioning, exclusion/bias, genuinely overcrowded trademark-risk naming.
-- severity = medium for: clichés, weak differentiation, vague positioning, clear audience mismatch on tone.
-- severity = low for: minor word choice polish, small naming readability nits that don't confuse.
-- proposed_alternative: always a full replacement text for the decision.content field of the affected decision, not just advice. Preserve structured ### sections for categories that have them.
-- NEVER recommend changing decisions to use the banned clichés themselves.
-- Do not add commentary beyond the JSON object. Do not wrap JSON in markdown.`;
-
-function normalizeSeverity(raw: unknown): ChallengeIssue["severity"] | null {
-  if (typeof raw !== "string") return null;
-  const s = raw.trim().toLowerCase();
-  if (s === "high" || s === "medium" || s === "low") return s;
-  return null;
-}
+- Cover the decisions that the five checks actually apply to. A clean brand returns a short list of PASS results, or {"checks": []} if there is nothing to say.
+- affected/decision categories must be one of the 11 brand categories: ${CATEGORIES.join(", ")}.
+- "alternative" replaces the whole decision content. Preserve any structured ### sections the original uses, and keep the length comparable.
+- Never propose alternative wording that uses the banned clichés.
+- Do not add commentary beyond the JSON object.`;
 
 function normalizeCategory(raw: unknown): BrandDecisionCategory | null {
   if (typeof raw !== "string") return null;
@@ -131,56 +153,52 @@ function normalizeCategory(raw: unknown): BrandDecisionCategory | null {
     : null;
 }
 
+function toIssue(check: BrandCheck, decisions: ReadonlyMap<string, CriticDecisionInput>): ChallengeIssue {
+  const decision = decisions.get(check.decision_id);
+  const title = (decision?.title ?? "").trim();
+  const label = checkLabel(check.check_type);
+  return {
+    id: check.id,
+    severity: checkSeverity(check.check_type),
+    check_type: check.check_type,
+    status: check.status,
+    affected_decision_id: check.decision_id,
+    affected_category: (normalizeCategory(check.decision_category) ??
+      normalizeCategory(decision?.category) ??
+      "POSITIONING") as BrandDecisionCategory,
+    issue_title: title ? `${label} — ${title}` : label,
+    issue: check.reason,
+    evidence: check.evidence.join("\n"),
+    proposed_alternative: check.alternative ?? check.reason,
+  };
+}
+
 export function validateCriticResponse(
   raw: unknown,
-  validDecisionIds: Set<string>,
-): { ok: true; result: { issues: ChallengeIssue[] } } | { ok: false; err: DiscoveryError } {
+  decisions: readonly CriticDecisionInput[],
+): { ok: true; result: CriticResult } | { ok: false; err: DiscoveryError } {
   if (!isRecord(raw)) {
     return { ok: false, err: { kind: "parse", message: "Critic response is not a JSON object.", raw } };
   }
-  const dto = raw as CriticResultRaw;
-  const issuesArr = Array.isArray(dto.issues) ? dto.issues : [];
-  const issues: ChallengeIssue[] = [];
-  const seenIds = new Set<string>();
-  for (const row of issuesArr) {
-    if (!isRecord(row)) continue;
-    const severity = normalizeSeverity(row.severity);
-    const decisionId =
-      typeof row.affected_decision_id === "string" ? row.affected_decision_id.trim() : "";
-    const category = normalizeCategory(row.affected_category);
-    if (!severity || !decisionId || !validDecisionIds.has(decisionId) || !category) continue;
-    const idRaw =
-      typeof row.id === "string" && row.id.trim().length > 0
-        ? row.id.trim().slice(0, 80)
-        : `crit_${Math.random().toString(36).slice(2, 9)}`;
-    const id = seenIds.has(idRaw) ? `${idRaw}_${Math.random().toString(36).slice(2, 6)}` : idRaw;
-    seenIds.add(id);
-    const issue_title = typeof row.issue_title === "string" ? row.issue_title.trim().slice(0, 160) : "Issue";
-    const issue = typeof row.issue === "string" ? row.issue.trim().slice(0, 2500) : "";
-    const evidence = typeof row.evidence === "string" ? row.evidence.trim().slice(0, 2500) : "";
-    const proposed_alternative =
-      typeof row.proposed_alternative === "string" ? row.proposed_alternative.trim().slice(0, 5000) : "";
-    if (!issue || !evidence || !proposed_alternative) continue;
-    issues.push({
-      id,
-      severity,
-      affected_decision_id: decisionId,
-      affected_category: category,
-      issue_title,
-      issue,
-      evidence,
-      proposed_alternative,
-    });
-    if (issues.length > 60) break;
-  }
-  return { ok: true, result: { issues } };
+  const byId = new Map(decisions.map((d) => [d.id, d]));
+  const checks = normalizeBrandChecks(raw, {
+    validDecisionIds: new Set(byId.keys()),
+    decisions: decisions.map((d) => ({
+      id: d.id,
+      category: d.category,
+      title: d.title,
+      content: d.content,
+    })),
+  });
+  const issues = needsReviewChecks(checks).map((check) => toIssue(check, byId));
+  return { ok: true, result: { checks, issues } };
 }
 
 export async function runBrandCritic(
   activeDecisions: readonly CriticDecisionInput[],
   approvedContext: readonly CriticContextInput[],
   methodologyReferences?: string,
-): Promise<{ ok: true; result: { issues: ChallengeIssue[] } } | { ok: false; err: DiscoveryError }> {
+): Promise<{ ok: true; result: CriticResult } | { ok: false; err: DiscoveryError }> {
   if (activeDecisions.length === 0) {
     return {
       ok: false,
@@ -195,7 +213,6 @@ export async function runBrandCritic(
     return { ok: false, err: { kind: "config", message: cfgRes.message } };
   }
   const { cfg } = cfgRes;
-  const validIds = new Set(activeDecisions.map((d) => d.id));
   const decisionLines: string[] = [];
   for (const d of activeDecisions) {
     decisionLines.push(
@@ -221,16 +238,16 @@ Use these references to sharpen critique standards only. Do not invent startup f
 `
     : "";
 
-  const userPrompt = `Critique the following active brand decisions.
+  const userPrompt = `Check the following active brand decisions against the five checks in your instructions.
 
-ACTIVE BRAND DECISIONS (these are the only allowed values for affected_decision_id):
+ACTIVE BRAND DECISIONS (the only allowed values for decision_id):
 ${decisionLines.join("\n\n")}
 
-APPROVED STARTUP CONTEXT (for grounding evidence / detector 3 / detector 4 checks):
+APPROVED STARTUP CONTEXT (the only grounding for audience and claim checks — if it does not cover what a check needs, answer INSUFFICIENT_EVIDENCE and name what is missing):
 ${ctxLines.length > 0 ? ctxLines.join("\n") : "(none)"}
 
 ${methodologyBlock}
-Banned clichés list and 8 detectors are in your instructions. Only report real, defensible defects. If nothing is wrong, return {"issues": []}. Return ONLY the JSON object.`;
+Quote the exact wording you relied on. Return {"checks": []} if the decisions hold up. Return ONLY the JSON object.`;
 
   let url: string;
   let headers: Record<string, string>;
@@ -245,7 +262,7 @@ Banned clichés list and 8 detectors are in your instructions. Only report real,
     };
     body = {
       model: cfg.model,
-      max_tokens: 4000,
+      max_tokens: 6000,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: [{ type: "text", text: userPrompt }] }],
     };
@@ -265,7 +282,7 @@ Banned clichés list and 8 detectors are in your instructions. Only report real,
       ],
       generationConfig: {
         temperature: 0.15,
-        maxOutputTokens: 4000,
+        maxOutputTokens: 6000,
         responseMimeType: "application/json",
       },
     };
@@ -379,5 +396,5 @@ Banned clichés list and 8 detectors are in your instructions. Only report real,
   } catch {
     return { ok: false, err: { kind: "parse", message: "AI response was not valid JSON.", raw: jsonStr.slice(0, 1500) } };
   }
-  return validateCriticResponse(parsed, validIds);
+  return validateCriticResponse(parsed, activeDecisions);
 }

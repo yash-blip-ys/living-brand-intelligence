@@ -1,4 +1,4 @@
-"use server";
+﻿"use server";
 
 import { revalidatePath } from "next/cache";
 import {
@@ -22,6 +22,8 @@ import {
   type ProposedStrategyDecision,
 } from "@/lib/ai/strategy";
 import { orchestrateStrategyGeneration } from "@/lib/ai/orchestration";
+import { runRecommendationChallenge } from "@/lib/ai/dialogue";
+import { buildFounderGuidance } from "@/lib/ai/brand-direction";
 
 export type ProposedDecisionDraft = {
   tempId: string;
@@ -83,6 +85,7 @@ export async function filterActiveApprovedContext(
   );
 }
 
+
 export async function runStrategyGeneration(
   state: StrategyActionState | undefined,
   formData: FormData,
@@ -129,8 +132,19 @@ export async function runStrategyGeneration(
     existingActive = [];
   }
 
+  const founderGuidance = buildFounderGuidance({
+    priorities: formData.get("founderPriorities")?.toString() ?? null,
+    otherPriority: formData.get("founderOtherPriority")?.toString() ?? null,
+    mustCommunicate: formData.get("founderMustCommunicate")?.toString() ?? null,
+    neverFeel: formData.get("founderNeverFeel")?.toString() ?? null,
+    personality: formData.get("founderPersonality")?.toString() ?? null,
+    personalityOther: formData.get("founderPersonalityOther")?.toString() ?? null,
+    doNotOverride: formData.get("founderDoNotOverride")?.toString() ?? null,
+  });
+
   const res = await orchestrateStrategyGeneration({
     roughIdea,
+    founderGuidance: founderGuidance || undefined,
     approvedContext: approved.map((c) => ({
       id: c.id,
       type: c.type,
@@ -155,8 +169,7 @@ export async function runStrategyGeneration(
       console.error("[strategy:parse]", e.message, e.raw);
       return {
         roughIdea,
-        error:
-          "The AI returned a malformed strategy response. Please try again.",
+        error: e.message,
       };
     }
     // eslint-disable-next-line no-console
@@ -337,6 +350,88 @@ export async function rejectStrategyDecision(
       err instanceof Error ? err.message : "Could not reject this decision.";
     return { error: message };
   }
+}
+
+export type ChallengeReasoningState = {
+  error?: string;
+  configError?: boolean;
+  acknowledgement?: string | null;
+  resolution?: string | null;
+  revised?: {
+    title: string;
+    content: string;
+    rationale: string;
+    uncertainty: string | null;
+  } | null;
+  objection?: string | null;
+  tempId?: string | null;
+};
+
+/**
+ * Founder challenges one AI recommendation. This never writes to the database and
+ * never touches an active decision: the AI only answers with reasoning and an
+ * optional revision, which the founder must still approve explicitly.
+ */
+export async function challengeStrategyRecommendation(
+  _state: ChallengeReasoningState | undefined,
+  formData: FormData,
+): Promise<ChallengeReasoningState> {
+  void _state;
+  const startupId = formData.get("startupId")?.toString() ?? "";
+  const tempId = formData.get("tempId")?.toString() ?? "";
+  const category = formData.get("category")?.toString() ?? "";
+  const title = formData.get("title")?.toString() ?? "";
+  const content = formData.get("content")?.toString() ?? "";
+  const rationale = formData.get("rationale")?.toString() ?? "";
+  const objection = formData.get("objection")?.toString() ?? "";
+  const supporting = (formData.get("supporting_context_ids")?.toString() ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  if (!startupId || !tempId || !category || !title || !content) {
+    return { error: "Missing required fields." };
+  }
+  if (!objection.trim()) {
+    return { error: "Tell the AI what you disagree with first." };
+  }
+
+  let evidence = "";
+  if (supporting.length > 0) {
+    try {
+      const rows = await getContextItems(startupId);
+      evidence = rows
+        .filter((c) => supporting.includes(c.id))
+        .map((c) => `- [${c.type}] ${c.content}`)
+        .join("\n");
+    } catch {
+      evidence = "";
+    }
+  }
+
+  const res = await runRecommendationChallenge({
+    category,
+    title,
+    content,
+    rationale,
+    supportingEvidence: evidence,
+    founderObjection: objection,
+  });
+
+  if (!res.ok) {
+    const e = res.err;
+    if (e.kind === "config") return { configError: true, error: e.message, tempId };
+    console.error("[strategy:challenge]", e.message, e.raw);
+    return { error: e.message, tempId };
+  }
+
+  return {
+    acknowledgement: res.result.acknowledgement,
+    resolution: res.result.resolution,
+    revised: res.result.revised,
+    objection,
+    tempId,
+  };
 }
 
 export type { ProposedStrategyDecision };

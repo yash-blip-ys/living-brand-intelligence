@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useFormState, useFormStatus } from "react-dom";
+import { useMemo, useState, useActionState } from "react";
+import { useFormStatus } from "react-dom";
 import type {
   BrandDecision,
   ChangeAnalysis,
@@ -23,6 +23,56 @@ import {
   type FounderFactDraft,
   type ReviewState,
 } from "@/app/actions/evolution";
+import { toImpactType } from "@/lib/types/impact-types";
+
+const UUID_PATTERN =
+  /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi;
+
+const LABELED_UUID_PATTERN = new RegExp(
+  `\\b(fact|inference|hypothesis|assumption|context|evidence|decision)\\b[\\s:,#\\u2014-]*(${UUID_PATTERN.source})`,
+  "gi",
+);
+
+const DRIFT_LABEL: Record<string, string> = {
+  scope_expansion: "Scope expansion",
+  scope_shift: "Scope shift",
+  new_stakeholder: "New stakeholder",
+  tone_shift: "Tone shift",
+  contradiction: "Contradiction",
+  repositioning: "Repositioning",
+  new_evidence: "New evidence",
+  misalignment: "Misalignment",
+  opportunity: "Opportunity",
+  risk: "Risk",
+  audience_shift: "Audience shift",
+  message_change: "Message change",
+  other: "Other",
+  review: "Needs review",
+};
+
+function driftLabel(drift: string): string {
+  const key = drift.trim().toLowerCase().replace(/[\s-]+/g, "_");
+  return (
+    DRIFT_LABEL[key] ??
+    key
+      .split("_")
+      .filter(Boolean)
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ")
+  );
+}
+
+/**
+ * Internal ids must never reach the reader. Stored rationales and model-written
+ * explanations quote the ids of the items they reason about, so render them as
+ * references instead of identifiers.
+ */
+function humanize(text: string | null | undefined): string {
+  if (!text) return "";
+  return text
+    .replace(LABELED_UUID_PATTERN, "the $1")
+    .replace(UUID_PATTERN, "the related item");
+}
 
 type Props = {
   startupId: string;
@@ -126,7 +176,7 @@ function buildImpactDraft(
   imp: ChangeAnalysisImpact,
   d: BrandDecision | undefined,
   links: Map<string, string[]>,
-): ChangeImpactDraft {
+): ChangeImpactDraft | null {
   const decision = d ?? {
     id: imp.brand_decision_id,
     category: "POSITIONING",
@@ -134,6 +184,12 @@ function buildImpactDraft(
     content: "",
     rationale: null,
   } as BrandDecision;
+  const impactType =
+    toImpactType(imp.impact_type) ?? toImpactType(decision.category);
+  // The column's check constraint only ever stores decision categories, so this
+  // is unreachable for real rows; skip rather than invent a value if it ever is
+  // not.
+  if (!impactType) return null;
   return {
     impact_id: imp.id,
     brand_decision_id: imp.brand_decision_id,
@@ -142,7 +198,7 @@ function buildImpactDraft(
     decision_content: decision.content,
     decision_rationale: decision.rationale,
     decision_supporting_context_ids: links.get(imp.brand_decision_id) ?? [],
-    impact_type: imp.impact_type,
+    impact_type: impactType,
     severity: imp.severity,
     reason: imp.reason,
     needs_review: true,
@@ -161,8 +217,8 @@ export function EvolutionSection({
   approvedContext,
   decisionContextLinks,
 }: Props) {
-  const [addState, dispatchAdd] = useFormState(addFounderContext, ADD_EMPTY);
-  const [analyzeState, dispatchAnalyze] = useFormState(
+  const [addState, dispatchAdd] = useActionState(addFounderContext, ADD_EMPTY);
+  const [analyzeState, dispatchAnalyze] = useActionState(
     runChangeAnalysisFromContext,
     ANALYZE_EMPTY,
   );
@@ -199,10 +255,12 @@ export function EvolutionSection({
       }
       let analyses: ChangeAnalysisDraft[] = initialAnalyses.map((a) => {
         const impacts = impactsByAnalysis.get(a.id) ?? [];
-        const drafts: ChangeImpactDraft[] = impacts.map((imp) => {
-          const d = decisionsById.get(imp.brand_decision_id);
-          return buildImpactDraft(imp, d, linksByDecision);
-        });
+        const drafts: ChangeImpactDraft[] = impacts
+          .map((imp) => {
+            const d = decisionsById.get(imp.brand_decision_id);
+            return buildImpactDraft(imp, d, linksByDecision);
+          })
+          .filter((imp): imp is ChangeImpactDraft => imp !== null);
         const src = approvedContext.find(
           (c) => c.id === a.source_context_item_id,
         );
@@ -533,9 +591,9 @@ function AnalysisCard({
     return res;
   };
 
-  const [_aState, approveAction] = useFormState(bindApprove, {});
-  const [_kState, keepAction] = useFormState(bindKeep, {});
-  const [_rState, rejectAction] = useFormState(bindReject, {});
+  const [_aState, approveAction] = useActionState(bindApprove, {});
+  const [_kState, keepAction] = useActionState(bindKeep, {});
+  const [_rState, rejectAction] = useActionState(bindReject, {});
   void _aState;
   void _kState;
   void _rState;
@@ -558,7 +616,7 @@ function AnalysisCard({
               </span>
             </div>
             <h4 className="text-base font-semibold leading-snug tracking-tight text-foreground">
-              {analysis.summary}
+              {humanize(analysis.summary)}
             </h4>
             <div className="text-xs text-muted-foreground space-y-1">
               <div>
@@ -725,9 +783,11 @@ function ImpactItem({
           >
             {impact.severity} impact
           </span>
-          <span className="inline-flex items-center text-[10px] uppercase tracking-widest font-medium px-2 py-0.5 rounded-full border border-border text-foreground">
-            {impact.impact_type}
-          </span>
+          {impact.drift_type && (
+            <span className="inline-flex items-center text-[10px] uppercase tracking-widest font-medium px-2 py-0.5 rounded-full border border-border text-foreground">
+              {driftLabel(impact.drift_type)}
+            </span>
+          )}
           <span className="inline-flex items-center text-[10px] uppercase tracking-widest font-medium px-2 py-0.5 rounded-full border border-foreground/20 text-foreground">
             {decisionCategoryLabel(impact.decision_category)}
           </span>
@@ -748,7 +808,7 @@ function ImpactItem({
           Why this may need review
         </div>
         <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap border-l-2 border-border pl-3">
-          {impact.reason}
+          {humanize(impact.reason)}
         </p>
       </div>
 
@@ -783,10 +843,10 @@ function ImpactItem({
                   )}
                 </div>
                 <h5 className="text-sm font-semibold tracking-tight text-foreground">
-                  {d.title}
+                  {humanize(d.title)}
                 </h5>
                 <p className="text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap">
-                  {d.content}
+                  {humanize(d.content)}
                 </p>
               </li>
             ))}
@@ -805,17 +865,17 @@ function ImpactItem({
             </span>
           </div>
           <h5 className="text-sm font-semibold text-foreground tracking-tight">
-            {impact.decision_title}
+            {humanize(impact.decision_title)}
           </h5>
           <p className="text-xs leading-relaxed text-foreground whitespace-pre-wrap">
-            {impact.decision_content}
+            {humanize(impact.decision_content)}
           </p>
           {impact.decision_rationale && (
             <p className="text-[11px] leading-relaxed text-muted-foreground whitespace-pre-wrap border-l-2 border-border pl-2.5 pt-0.5">
               <span className="uppercase tracking-[0.18em] mr-1.5 text-[9px]">
                 Why
               </span>
-              {impact.decision_rationale}
+              {humanize(impact.decision_rationale)}
             </p>
           )}
           {renderDecisionSupport(
@@ -844,17 +904,17 @@ function ImpactItem({
 
           </div>
           <h5 className="text-sm font-semibold text-foreground tracking-tight">
-            {impact.proposed_title || impact.decision_title}
+            {humanize(impact.proposed_title || impact.decision_title)}
           </h5>
           <p className="text-xs leading-relaxed text-foreground whitespace-pre-wrap">
-            {impact.proposed_content || impact.decision_content}
+            {humanize(impact.proposed_content || impact.decision_content)}
           </p>
           {impact.proposed_rationale && (
             <p className="text-[11px] leading-relaxed text-muted-foreground whitespace-pre-wrap border-l-2 border-border pl-2.5 pt-0.5">
               <span className="uppercase tracking-[0.18em] mr-1.5 text-[9px]">
                 Why changed
               </span>
-              {impact.proposed_rationale}
+              {humanize(impact.proposed_rationale)}
             </p>
           )}
         </div>

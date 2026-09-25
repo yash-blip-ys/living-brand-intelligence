@@ -16,6 +16,7 @@ import type { ChangeAnalysis, ChangeAnalysisImpact } from "@/lib/types/database"
 import type { DecisionContextSupport } from "@/lib/db/brand-decisions";
 import type { FounderFactDraft } from "@/app/actions/evolution";
 import { WorkspaceTabs } from "@/app/components/workspace-tabs";
+import { StageProgressProvider } from "@/app/components/stage-progress";
 import { OverviewSection } from "@/app/components/overview-section";
 import { DiscoverySection } from "@/app/components/discovery-section";
 import { BrandStrategySection } from "@/app/components/brand-strategy-section";
@@ -139,6 +140,15 @@ export default async function StartupWorkspacePage({
       </header>
 
       <main className="mx-auto w-full max-w-5xl px-6 py-8 flex-1">
+        <StageProgressProvider
+          initial={{
+            discovery: activeContext.length > 0,
+            strategy: brandDecisions.filter((d) => d.status === "active").length > 0,
+            challenge: false,
+            deliver: false,
+            evolution: changeAnalyses.length > 0,
+          }}
+        >
         <WorkspaceTabs
           defaultTab="overview"
           slots={{
@@ -201,6 +211,7 @@ export default async function StartupWorkspacePage({
             ),
           }}
         />
+        </StageProgressProvider>
       </main>
 
       <footer className="border-t border-border">

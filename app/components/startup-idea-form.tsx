@@ -1,6 +1,7 @@
 "use client";
 
-import { useFormState, useFormStatus } from "react-dom";
+import { useActionState } from "react";
+import { useFormStatus } from "react-dom";
 import {
   createStartupAction,
   type StartupActionState,
@@ -22,7 +23,7 @@ function SubmitButton() {
 const initialState: StartupActionState | undefined = undefined;
 
 export function StartupIdeaForm() {
-  const [state, formAction] = useFormState(createStartupAction, initialState);
+  const [state, formAction] = useActionState(createStartupAction, initialState);
 
   return (
     <form action={formAction} className="flex flex-col gap-5">
