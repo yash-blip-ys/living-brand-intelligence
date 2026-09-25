@@ -1,0 +1,283 @@
+---
+alwaysApply: true
+---
+
+---
+description: Define the core product concept, boundaries, and architecture principles for the living brand intelligence system.
+alwaysApply: true
+---
+
+# Product Core — Living Brand Intelligence System
+
+## 1. Product thesis
+
+We are building a living AI brand intelligence system for startups, founders, creators, and early-stage ideas.
+
+The product helps transform a rough idea into a structured brand system while preserving the reasoning and context behind important brand decisions.
+
+The core loop is:
+
+Raw idea
+→ Discovery
+→ Structured startup context
+→ Brand strategy
+→ Brand decisions
+→ Persistent brand context
+→ New evidence or request
+→ Detect affected decisions
+→ Founder review
+→ Coherent brand evolution
+
+This is the core product. Do not accidentally turn it into a generic AI writing or branding tool.
+
+## 2. Core problem
+
+AI branding tools can produce polished outputs while losing the specific meaning of the startup.
+
+The product must therefore preserve:
+- What the startup actually does
+- Who it serves
+- The problem it solves
+- Why the problem matters
+- How the product solves it
+- What makes it different
+- Important founder reasoning
+- Important brand decisions
+- Previous alternatives and rejected decisions
+- New evidence that may change the brand
+
+The system should allow the brand to evolve when the startup evolves.
+
+Do NOT permanently freeze the original idea.
+
+Preserve the history and reasoning while allowing confirmed decisions to change.
+
+## 3. Startup context model
+
+Never treat the startup context as one large block of AI-generated memory.
+
+Use explicit categories:
+
+- FACT — explicitly provided or confirmed by the founder
+- INFERENCE — AI-derived interpretation of available information
+- HYPOTHESIS — proposed but not confirmed
+- DECISION — founder-approved strategic decision
+- REJECTED — considered but rejected
+- SUPERSEDED — previously active but replaced by a newer decision
+
+When possible, context should also have:
+- source
+- timestamp
+- confidence
+- relationship to related decisions
+
+Founder-confirmed information must not silently be replaced by AI assumptions.
+
+## 4. Brand decision traceability
+
+Important brand decisions should be traceable to the startup context that produced them.
+
+Examples:
+- Positioning
+- Target audience
+- Value proposition
+- Brand personality
+- Messaging
+- Tagline
+- Naming direction
+- Visual direction
+
+Every important decision should answer:
+
+"Why does this exist?"
+
+The UI should eventually allow the founder to inspect the reasoning, evidence, or context behind a decision.
+
+Do not fabricate reasoning after the fact.
+
+## 5. Brand evolution and drift detection
+
+When new information is introduced, do not silently rewrite the existing brand.
+
+Instead:
+
+1. Identify the new information.
+2. Compare it with existing startup context.
+3. Determine whether existing decisions are affected.
+4. Explain which decisions may be affected and why.
+5. Let the founder review the proposed changes.
+6. Apply approved changes.
+7. Preserve the previous decision as superseded/rejected history when appropriate.
+
+Example:
+
+Existing:
+FACT → "College students are the primary users."
+
+Later:
+FACT → "Hackathon organizers are actually the paying customers."
+
+The system should detect that this may affect:
+- target audience
+- positioning
+- value proposition
+- messaging
+
+It should surface the change instead of silently rewriting everything.
+
+## 6. Anti-generic principle
+
+Every important AI-generated brand decision should be grounded in startup-specific context.
+
+Avoid generic statements such as:
+
+"Empowering the next generation of innovators."
+
+unless they are meaningfully supported by the startup's actual context.
+
+The system should prefer specificity based on:
+- actual users
+- actual problem
+- actual mechanism
+- actual differentiator
+- actual business model
+- actual founder decisions
+
+A polished output that could describe thousands of unrelated startups is not sufficient.
+
+## 7. AI responsibilities
+
+Use AI for tasks requiring reasoning:
+
+- Discovery interviews
+- Startup context extraction
+- Strategic interpretation
+- Brand alternatives
+- Contradiction detection
+- Genericity detection
+- Decision reasoning
+- Brand drift detection
+- Impact analysis
+- Strategic critique
+
+Use deterministic code for:
+
+- CRUD
+- Database operations
+- Filtering
+- Sorting
+- Status changes
+- Timestamps
+- Relationships
+- Validation
+- UI state
+- Deterministic calculations
+
+Do not use an LLM for something ordinary TypeScript can reliably do.
+
+## 8. Human approval
+
+The founder remains the decision maker.
+
+AI may:
+- suggest
+- infer
+- challenge
+- compare
+- explain
+
+AI must not silently make important strategic decisions on behalf of the founder.
+
+Important decisions should have an explicit state such as:
+- Proposed
+- Approved
+- Rejected
+- Superseded
+
+## 9. Product boundaries
+
+The MVP is NOT primarily:
+
+- A generic chatbot
+- A logo generator
+- A website builder
+- A social media scheduler
+- A generic copywriting tool
+- A generic brand-book generator
+
+These may become supporting capabilities later, but they are not the product's core value.
+
+The core value is:
+
+Understanding the startup
+→ structuring its context
+→ making brand decisions traceable
+→ detecting when the startup changes
+→ helping the brand evolve coherently
+
+## 10. MVP priority
+
+When deciding what to build first, prioritize:
+
+1. Startup discovery
+2. Structured startup context
+3. Brand strategy generation
+4. Persistent brand decisions
+5. Decision traceability
+6. Context change detection
+7. Brand impact analysis
+8. Founder approval
+9. Clear UI for the above workflow
+10. Demo reliability
+
+Optional features must not delay the core workflow.
+
+## 11. Architecture principle
+
+Prefer a simple architecture:
+
+Next.js
+→ React UI
+→ Server Actions/API
+→ AI orchestration
+→ Supabase/PostgreSQL
+
+Use structured database records for startup context and brand decisions.
+
+Do not introduce:
+- Microservices
+- Redis
+- Message queues
+- Vector databases
+- Complex agent frameworks
+- Event buses
+- Elaborate state machines
+
+unless a specific implemented feature genuinely requires one.
+
+## 12. Product integrity rule
+
+Before implementing a significant feature, ask:
+
+"Does this strengthen the living brand intelligence system?"
+
+If it does not, do not add it merely because it is technically interesting.
+
+Favor a smaller product that demonstrates the core concept clearly over a larger product with disconnected AI features.
+
+## 13. Demo principle
+
+The complete MVP should eventually demonstrate one clear story:
+
+Founder enters a rough startup idea
+→ AI asks useful discovery questions
+→ startup context is structured
+→ brand strategy is generated
+→ founder approves decisions
+→ decisions become persistent
+→ founder introduces new information
+→ system detects affected brand decisions
+→ founder reviews the impact
+→ brand evolves without losing its history
+
+The demo should make the AI workflow visible rather than hiding everything behind a single "Generate Brand" button.

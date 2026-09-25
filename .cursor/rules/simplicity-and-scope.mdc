@@ -1,0 +1,221 @@
+---
+alwaysApply: true
+---
+
+---
+description: Enforce simplicity, YAGNI, scope control, token efficiency, and hackathon-speed implementation.
+alwaysApply: true
+---
+
+# Simplicity, Anti-Overengineering & Token Efficiency
+
+You are working on a time-constrained hackathon MVP. Optimize for a reliable, simple implementation that demonstrates the core product idea. Do not over-engineer.
+
+## 1. Core principle
+
+Build the simplest implementation that fully satisfies the current user request.
+
+Prefer:
+
+- Simple code over clever code.
+- Existing project patterns over new abstractions.
+- Standard Next.js/React/TypeScript patterns over custom frameworks.
+- One working implementation over multiple speculative implementations.
+- Fewer dependencies.
+- Fewer files when the same result can be achieved cleanly.
+- Direct data flow over unnecessary layers.
+
+Do NOT optimize for hypothetical future scale.
+
+## 2. Mandatory YAGNI check
+
+Before implementing a non-trivial feature, ask internally:
+
+"Is this required for the current MVP or explicitly requested?"
+
+If NO:
+
+- Do not build it.
+- Do not create supporting abstractions for it.
+- Do not add configuration for it.
+- Do not add database tables for it.
+- Do not add dependencies for it.
+
+Do not implement:
+
+- speculative edge cases
+- future extensibility
+- unused abstractions
+- unused API endpoints
+- unused database fields
+- unnecessary caching
+- unnecessary queues
+- unnecessary microservices
+- unnecessary state-management libraries
+
+## 3. Mandatory KISS check
+
+When multiple approaches work, choose the simplest standard approach.
+
+Prefer:
+
+- local React state before global state
+- server actions/API routes before a separate backend
+- PostgreSQL/Supabase tables before introducing another datastore
+- existing libraries already in package.json before adding a new dependency
+- simple functions before service/repository/factory abstractions
+- one component before splitting into many components without a clear reason
+
+Do not introduce:
+
+- Redis
+- message queues
+- microservices
+- vector databases
+- complex agent frameworks
+- event buses
+- custom state machines
+- elaborate design patterns
+
+unless the current feature genuinely requires them.
+
+## 4. Scope discipline
+
+Modify only what is necessary for the requested task.
+
+Do NOT:
+
+- refactor unrelated code
+- rename unrelated files
+- reorganize the project unnecessarily
+- rewrite working code for stylistic reasons
+- replace working libraries without a concrete reason
+- add "nice to have" features
+- change the architecture without explaining why it is necessary
+
+If you discover an unrelated improvement, mention it briefly instead of implementing it.
+
+## 5. Token efficiency
+
+Be concise.
+
+For simple tasks:
+
+- Execute the task directly.
+- Avoid long explanations.
+- Do not repeat requirements.
+- Do not describe obvious code.
+
+For complex tasks:
+
+1. State the implementation approach briefly.
+2. Implement only the required scope.
+3. Verify the result.
+4. Report only important changes and problems.
+
+Do not generate large amounts of boilerplate when a smaller implementation works.
+
+## 6. Hackathon priority
+
+Prioritize work in this order:
+
+1. Core product functionality
+2. AI workflow and reasoning quality
+3. Startup context model
+4. Brand decision traceability
+5. Context evolution / drift detection
+6. Reliable end-to-end demo
+7. UI polish
+8. Optional enhancements
+
+If time is limited, cut optional features before compromising the core workflow.
+
+## 7. Product-specific constraint
+
+The core product is a living brand intelligence system.
+
+Do not accidentally turn it into a generic:
+
+- AI chatbot
+- logo generator
+- website builder
+- social media generator
+- generic brand-book generator
+
+Every significant implementation decision should support:
+
+Raw startup idea
+→ structured startup context
+→ brand decisions
+→ persistent brand context
+→ new evidence/request
+→ detect affected decisions
+→ founder review
+→ coherent brand evolution
+
+## 8. Startup context model
+
+The system must distinguish between:
+
+- FACT
+- INFERENCE
+- HYPOTHESIS
+- DECISION
+- REJECTED/SUPERSEDED
+
+Do not collapse these into one generic "memory" field.
+
+The founder's confirmed information must not silently be replaced by AI assumptions.
+
+The system should preserve decision history while allowing the founder to change decisions.
+
+## 9. AI behavior
+
+Do not use an LLM call where deterministic code can perform the job reliably.
+
+Use AI for tasks that require reasoning, such as:
+
+- extracting startup context
+- asking useful discovery questions
+- generating strategic alternatives
+- identifying contradictions
+- evaluating potential brand drift
+- explaining strategic trade-offs
+
+Use normal TypeScript logic for deterministic tasks such as:
+
+- CRUD
+- filtering
+- status changes
+- timestamps
+- relationships
+- basic validation
+- UI state
+
+## 10. Before complex implementation
+
+For a genuinely complex multi-file change, briefly state:
+
+- what will change
+- why it is necessary
+- the simplest implementation approach
+
+Then implement.
+
+Do not create a lengthy plan for a small change.
+
+## 11. Verification
+
+After meaningful code changes:
+
+- Run the relevant typecheck/build/test command when practical.
+- Fix errors caused by your changes.
+- Do not spend excessive time fixing unrelated pre-existing warnings.
+
+A working MVP is more important than perfect code.
+
+## 12. Stop condition
+
+Once the requested feature works and is verified, STOP.
+
+Do not continue adding improvements unless explicitly requested.
