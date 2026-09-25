@@ -8,8 +8,25 @@ It is not a brand-book generator and not a chat box that writes marketing copy. 
 
 ---
 
+## Demo
+
+The full loop in one pass: a rough idea becomes structured context, context becomes approved brand decisions, the critic stress-tests them, the kit is exported, and then a new founder fact arrives and the system shows exactly which decision it invalidates.
+
+<a href="video-EZRlGyG76uDg4hV7TpJ5.mp4">
+  <video
+    src="video-EZRlGyG76uDg4hV7TpJ5.mp4"
+    controls
+    preload="metadata"
+    width="100%"
+  ></video>
+  <em>▶ Watch the walkthrough (MP4, 6 MB) — if the player does not load, open the file directly.</em>
+</a>
+
+---
+
 ## Table of contents
 
+- [Demo](#demo)
 - [The problem](#the-problem)
 - [How the product works](#how-the-product-works)
 - [Architecture](#architecture)
