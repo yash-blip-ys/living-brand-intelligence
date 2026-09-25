@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/server";
-import type { Startup } from "@/lib/types/database";
+import type { Json, Startup } from "@/lib/types/database";
 
 export async function createStartup(
   rawIdea: string,
@@ -44,4 +44,27 @@ export async function getStartup(
   }
 
   return data as Startup | null;
+}
+
+/**
+ * Stores the outcome of a finished Challenge run on the startup it belongs to,
+ * so stage completion and the Quality cards can be derived from the run itself
+ * after a reload instead of from client state.
+ */
+export async function saveChallengeRun(
+  startupId: string,
+  run: Json,
+): Promise<void> {
+  if (!startupId) throw new Error("Startup ID is required.");
+
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("startups")
+    .update({ challenge_run: run, updated_at: new Date().toISOString() })
+    .eq("id", startupId);
+
+  if (error) {
+    throw new Error(`Failed to save challenge run: ${error.message}`);
+  }
 }

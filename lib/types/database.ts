@@ -73,6 +73,7 @@ export interface Database {
           name: string;
           raw_idea: string | null;
           description: string | null;
+          challenge_run: Json | null;
         };
         Insert: {
           id?: string;
@@ -81,6 +82,7 @@ export interface Database {
           name: string;
           raw_idea?: string | null;
           description?: string | null;
+          challenge_run?: Json | null;
         };
         Update: {
           id?: string;
@@ -89,6 +91,7 @@ export interface Database {
           name?: string;
           raw_idea?: string | null;
           description?: string | null;
+          challenge_run?: Json | null;
         };
       };
 

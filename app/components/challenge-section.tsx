@@ -28,6 +28,7 @@ import { checkLabel, insufficientEvidenceChecks, type BrandCheck } from "@/lib/a
 import { useStageProgress } from "@/app/components/stage-progress";import type { ConsistencyPairResult } from "@/lib/ai/consistency";
 import type { BrandEvaluation } from "@/lib/ai/evaluation/evaluator";
 import type { DecisionContextSupport } from "@/lib/db/brand-decisions";
+import { summarizeChallengeRun } from "@/lib/challenge-run";
 
 type Props = {
   startupId: string;
@@ -735,20 +736,12 @@ export function ChallengeSection({
   }, [critiqueCompleted, markCompleted]);
   // Publish what the run actually returned, so the Deliver Quality cards report
   // this run instead of a placeholder. Nothing is derived from assumptions here.
+  // Same projection the server persisted, so the two cannot disagree.
   useEffect(() => {
     if (critiqueState.issues) {
-      const returned = critiqueState.issues;
-      publishChallengeRun({
-        status: "complete",
-        issueCount: returned.length,
-        high: returned.filter((i) => i.severity === "high").length,
-        medium: returned.filter((i) => i.severity === "medium").length,
-        low: returned.filter((i) => i.severity === "low").length,
-        checksRun: (critiqueState.checks ?? []).length,
-        ungrounded: (critiqueState.checks ?? []).filter(
-          (c) => c.status === "INSUFFICIENT_EVIDENCE",
-        ).length,
-      });
+      publishChallengeRun(
+        summarizeChallengeRun(critiqueState.issues, critiqueState.checks ?? []),
+      );
     } else if (critiqueState.error) {
       publishChallengeRun({
         status: "error",

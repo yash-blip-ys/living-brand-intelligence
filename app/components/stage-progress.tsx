@@ -18,19 +18,8 @@ export type StageKey =
 export type StageCompletion = Partial<Record<StageKey, boolean>>;
 
 /** What a finished Challenge run actually returned. */
-export type ChallengeRunSummary = {
-  status: "complete" | "error";
-  /** Reviewable findings, exactly as the run returned them. */
-  issueCount: number;
-  high: number;
-  medium: number;
-  low: number;
-  /** Total checks the critic reported, including passes. */
-  checksRun: number;
-  /** Checks that could not be grounded, so no verdict was reported. */
-  ungrounded: number;
-  error?: string;
-};
+export type { ChallengeRunSummary } from "@/lib/challenge-run";
+import type { ChallengeRunSummary } from "@/lib/challenge-run";
 
 /** What a finished Consistency run actually returned. */
 export type ConsistencyRunSummary = {
@@ -56,14 +45,10 @@ type StageProgressValue = {
  * Single source of truth for stage completion, plus the real outcome of the
  * two Challenge-tab runs.
  *
- * Stages backed by persisted founder output (Discovery, Brand, Evolution) are
- * seeded from the server. A stage whose completion is an event rather than a
- * row — Challenge — marks itself complete here, so the tab badge and the
- * header counter read the same state instead of each keeping its own.
- *
- * The run summaries are a projection of the state the runs already produce:
- * ChallengeSection remains the only owner of that state and publishes it, so
- * the Quality cards in Deliver report what happened rather than a placeholder.
+ * Every stage is seeded from the server: Discovery, Brand and Evolution from
+ * their persisted founder output, Challenge from the persisted run summary on
+ * the startup. A run that happens in this session then publishes itself, so the
+ * tick appears immediately without becoming the source of truth.
  */
 const StageProgressContext = createContext<StageProgressValue>({
   completed: {},
@@ -80,13 +65,17 @@ function sameRun<T extends { status: string }>(prev: T | null, next: T): boolean
 
 export function StageProgressProvider({
   initial,
+  initialChallengeRun,
   children,
 }: {
   initial?: StageCompletion;
+  initialChallengeRun?: ChallengeRunSummary | null;
   children: ReactNode;
 }) {
   const [completed, setCompleted] = useState<StageCompletion>(initial ?? {});
-  const [challengeRun, setChallengeRun] = useState<ChallengeRunSummary | null>(null);
+  const [challengeRun, setChallengeRun] = useState<ChallengeRunSummary | null>(
+    initialChallengeRun ?? null,
+  );
   const [consistencyRun, setConsistencyRun] = useState<ConsistencyRunSummary | null>(null);
   const value = useMemo<StageProgressValue>(
     () => ({

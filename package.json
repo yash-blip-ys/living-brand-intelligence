@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --experimental-strip-types --import ./tests/register.mjs --test tests/brand-checks.test.ts tests/evolution-impact-types.test.ts"
+    "test": "node --experimental-strip-types --import ./tests/register.mjs --test tests/brand-checks.test.ts tests/evolution-impact-types.test.ts tests/challenge-run.test.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

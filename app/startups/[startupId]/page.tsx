@@ -17,6 +17,7 @@ import type { DecisionContextSupport } from "@/lib/db/brand-decisions";
 import type { FounderFactDraft } from "@/app/actions/evolution";
 import { WorkspaceTabs } from "@/app/components/workspace-tabs";
 import { StageProgressProvider } from "@/app/components/stage-progress";
+import { parseChallengeRun } from "@/lib/challenge-run";
 import { OverviewSection } from "@/app/components/overview-section";
 import { DiscoverySection } from "@/app/components/discovery-section";
 import { BrandStrategySection } from "@/app/components/brand-strategy-section";
@@ -119,6 +120,10 @@ export default async function StartupWorkspacePage({
   const displayName = startup.name?.trim() || "Untitled startup";
   const hasRawIdea = Boolean(startup.raw_idea?.trim());
   const roughIdeaText = startup.raw_idea?.trim() ?? "";
+  // Challenge completion is the persisted run, not a client-side flag, so the
+  // stage tick and the Quality cards survive a reload.
+  const challengeRun = parseChallengeRun(startup.challenge_run);
+  const challengeCompleted = challengeRun?.status === "complete";
 
   return (
     <div className="min-h-full flex-1 flex flex-col bg-zinc-50 dark:bg-black">
@@ -144,10 +149,11 @@ export default async function StartupWorkspacePage({
           initial={{
             discovery: activeContext.length > 0,
             strategy: brandDecisions.filter((d) => d.status === "active").length > 0,
-            challenge: false,
+            challenge: challengeCompleted,
             deliver: false,
             evolution: changeAnalyses.length > 0,
           }}
+          initialChallengeRun={challengeRun}
         >
         <WorkspaceTabs
           defaultTab="overview"

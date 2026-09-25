@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getStartup } from "@/lib/db/startups";
+import { getStartup, saveChallengeRun } from "@/lib/db/startups";
 import { getContextItems } from "@/lib/db/context";
 import {
   getBrandDecisions,
@@ -28,6 +28,7 @@ import {
   filterActiveApprovedContext,
 } from "@/app/actions/strategy";
 import type { StrategyResult } from "@/lib/ai/strategy";
+import { summarizeChallengeRun } from "@/lib/challenge-run";
 
 export type ChallengeCritiqueState = {
   error?: string;
@@ -234,6 +235,20 @@ export async function runChallengeCritique(
       return { configError: true, error: res.err.message };
     }
     return { error: res.err.message };
+  }
+  // Record the run itself. Stage completion and the Quality cards read this
+  // row, so a finished run keeps its ✓ after a reload. The critique already
+  // succeeded; a storage failure must not turn a real result into an error.
+  try {
+    await saveChallengeRun(
+      startupId,
+      summarizeChallengeRun(res.result.issues, res.result.checks),
+    );
+  } catch (err) {
+    console.error(
+      "[challenge:persist]",
+      err instanceof Error ? err.message : "Failed to save challenge run.",
+    );
   }
   return {
     issues: res.result.issues,
