@@ -6,6 +6,7 @@ import {
   createStartupAction,
   type StartupActionState,
 } from "@/app/actions/startups";
+import { BrandMark } from "@/app/components/brand-mark";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -13,9 +14,16 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="inline-flex h-11 w-full items-center justify-center rounded-full bg-primary px-6 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed transition-colors sm:w-auto"
+      className="press inline-flex h-11 w-full items-center justify-center gap-2.5 rounded-full bg-primary px-6 text-sm font-medium text-primary-foreground shadow-[0_1px_2px_oklch(0.4_0.06_42/0.18)] hover:brightness-[1.04] disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
     >
-      {pending ? "Creating workspace…" : "Start building the brand"}
+      {pending ? (
+        <>
+          <BrandMark size={15} trace className="text-primary-foreground" />
+          Creating workspace…
+        </>
+      ) : (
+        "Start building the brand"
+      )}
     </button>
   );
 }
@@ -41,7 +49,7 @@ export function StartupIdeaForm() {
           minLength={3}
           rows={6}
           placeholder='e.g. "A platform for college students to find compatible teammates for hackathon projects."'
-          className="flex w-full rounded-lg border border-input bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background resize-y min-h-[140px]"
+          className="field flex w-full rounded-2xl border border-input bg-card px-4 py-3.5 text-[1rem] leading-relaxed text-foreground placeholder:text-muted-foreground/60 resize-y min-h-[140px]"
         />
         <p className="text-xs text-muted-foreground">
           Don&apos;t polish it. Write what you have in mind — even a sentence
@@ -52,7 +60,7 @@ export function StartupIdeaForm() {
       {state?.error && (
         <div
           role="alert"
-          className="rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+          className="rounded-2xl border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive"
         >
           {state.error}
         </div>

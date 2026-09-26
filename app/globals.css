@@ -9,7 +9,7 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  --font-display: var(--font-display);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -39,82 +39,94 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
+  --radius-sm: calc(var(--radius) * 0.5);
+  --radius-md: calc(var(--radius) * 0.75);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  --radius-xl: calc(var(--radius) * 1.5);
+  --radius-2xl: calc(var(--radius) * 2);
+  --radius-3xl: calc(var(--radius) * 2.75);
+  --radius-4xl: calc(var(--radius) * 3.5);
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  /* Warm, paper-like foundation. Everything sits on cream, not white. */
+  --background: oklch(0.9855 0.006 84);
+  --foreground: oklch(0.275 0.018 55);
+
+  --card: oklch(0.9975 0.004 84);
+  --card-foreground: oklch(0.275 0.018 55);
+  --popover: oklch(0.9975 0.004 84);
+  --popover-foreground: oklch(0.275 0.018 55);
+
+  /* Restrained clay accent — used for the founder's own actions, nothing more. */
+  --primary: oklch(0.615 0.115 42);
+  --primary-foreground: oklch(0.985 0.008 84);
+
+  --secondary: oklch(0.955 0.014 78);
+  --secondary-foreground: oklch(0.32 0.02 55);
+  --muted: oklch(0.962 0.012 80);
+  --muted-foreground: oklch(0.505 0.014 62);
+  --accent: oklch(0.945 0.026 70);
+  --accent-foreground: oklch(0.34 0.04 50);
+
+  --destructive: oklch(0.565 0.15 28);
+  --border: oklch(0.902 0.012 72);
+  --input: oklch(0.902 0.012 72);
+  --ring: oklch(0.615 0.115 42);
+
+  --chart-1: oklch(0.615 0.115 42);
+  --chart-2: oklch(0.72 0.06 62);
+  --chart-3: oklch(0.52 0.03 70);
+  --chart-4: oklch(0.4 0.02 60);
+  --chart-5: oklch(0.3 0.015 55);
+
+  --radius: 0.75rem;
+
+  --sidebar: oklch(0.975 0.008 82);
+  --sidebar-foreground: oklch(0.275 0.018 55);
+  --sidebar-primary: oklch(0.615 0.115 42);
+  --sidebar-primary-foreground: oklch(0.985 0.008 84);
+  --sidebar-accent: oklch(0.945 0.026 70);
+  --sidebar-accent-foreground: oklch(0.34 0.04 50);
+  --sidebar-border: oklch(0.91 0.012 72);
+  --sidebar-ring: oklch(0.615 0.115 42);
+
+  /* Editorial display face for stage titles and decision statements. */
+  --font-display: var(--font-serif), ui-serif, Georgia, "Times New Roman", serif;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --background: oklch(0.205 0.012 55);
+  --foreground: oklch(0.945 0.012 82);
+  --card: oklch(0.245 0.014 55);
+  --card-foreground: oklch(0.945 0.012 82);
+  --popover: oklch(0.245 0.014 55);
+  --popover-foreground: oklch(0.945 0.012 82);
+  --primary: oklch(0.755 0.105 48);
+  --primary-foreground: oklch(0.22 0.015 55);
+  --secondary: oklch(0.3 0.014 55);
+  --secondary-foreground: oklch(0.94 0.012 82);
+  --muted: oklch(0.29 0.012 55);
+  --muted-foreground: oklch(0.72 0.014 70);
+  --accent: oklch(0.36 0.03 52);
+  --accent-foreground: oklch(0.93 0.02 78);
+  --destructive: oklch(0.68 0.14 26);
+  --border: oklch(1 0 0 / 9%);
+  --input: oklch(1 0 0 / 14%);
+  --ring: oklch(0.755 0.105 48);
+  --chart-1: oklch(0.755 0.105 48);
+  --chart-2: oklch(0.72 0.06 62);
+  --chart-3: oklch(0.62 0.03 70);
+  --chart-4: oklch(0.52 0.02 60);
+  --chart-5: oklch(0.42 0.015 55);
+  --sidebar: oklch(0.225 0.012 55);
+  --sidebar-foreground: oklch(0.945 0.012 82);
+  --sidebar-primary: oklch(0.755 0.105 48);
+  --sidebar-primary-foreground: oklch(0.22 0.015 55);
+  --sidebar-accent: oklch(0.34 0.03 52);
+  --sidebar-accent-foreground: oklch(0.93 0.02 78);
+  --sidebar-border: oklch(1 0 0 / 9%);
+  --sidebar-ring: oklch(0.755 0.105 48);
 }
 
 @layer base {
@@ -123,8 +135,415 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* A single warm light source, so the page reads as paper in daylight. */
+    background-image: radial-gradient(
+      120% 80% at 50% -10%,
+      oklch(0.995 0.012 80 / 90%) 0%,
+      transparent 60%
+    );
+    background-attachment: fixed;
+    text-rendering: optimizeLegibility;
   }
   html {
     @apply font-sans;
+    scroll-behavior: smooth;
+  }
+  ::selection {
+    background: oklch(0.615 0.115 42 / 18%);
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+  /* Quiet scrollbars: the chrome should never compete with the content. */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: oklch(0.88 0.014 72 / 70%);
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.8 0.02 68 / 80%);
+    background-clip: content-box;
+  }
+}
+
+@layer components {
+  /* Small caps label used above every major block. */
+  .eyebrow {
+    font-size: 0.6875rem;
+    line-height: 1;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+    font-weight: 500;
+  }
+
+  /* Display type for stage titles and the statements a founder reads first. */
+  .display {
+    font-family: var(--font-display);
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    line-height: 1.08;
+  }
+
+  /* A hairline that carries structure without drawing a box. */
+  .rule {
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      var(--border) 12%,
+      var(--border) 88%,
+      transparent
+    );
+  }
+
+  .prose-warm p {
+    margin-bottom: 0.85em;
+    line-height: 1.75;
+  }
+  .prose-warm p:last-child {
+    margin-bottom: 0;
+  }
+
+  /* ---------------------------------------------------------------------
+     Tactility.
+
+     Every rule here answers one question: what does this motion tell the
+     founder? Nothing that only decorates gets added. Durations stay in the
+     120–320ms band so the interface never feels like it is waiting.
+     --------------------------------------------------------------------- */
+
+  /* Fields: the border warms as focus arrives, the surface lifts a shade. */
+  /* Defined again in the utilities layer so it can win against the focus
+     utilities on individual controls; this copy documents the intent. */
+}
+
+@layer utilities {
+  /* ---------------------------------------------------------------------
+     Tactility, in the utilities layer so it outranks the per-button
+     `transition-colors` / `focus-visible:ring-*` utilities that are already
+     on these elements.
+     --------------------------------------------------------------------- */
+
+  /* Pressing anything should feel like touching something: a small lift on
+     approach, a settle on contact. Transform only, so nothing reflows. */
+  button:not([data-no-press]),
+  .press {
+    transition:
+      transform 140ms cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 140ms cubic-bezier(0.22, 1, 0.36, 1),
+      background-color 140ms ease,
+      border-color 140ms ease,
+      color 140ms ease,
+      opacity 140ms ease;
+  }
+  button:not([data-no-press]):hover:not(:disabled),
+  .press:hover:not([data-no-press]) {
+    transform: translate3d(0, -1px, 0);
+  }
+  button:not([data-no-press]):active:not(:disabled),
+  .press:active:not([data-no-press]) {
+    transform: translate3d(0, 1.5px, 0) scale(0.985);
+    transition-duration: 90ms;
+  }
+
+  /* For clickable surfaces that are not buttons: they respond, they do not
+     lift. */
+  .press-quiet {
+    transition:
+      background-color 150ms ease,
+      color 150ms ease,
+      border-color 150ms ease,
+      transform 150ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .press-quiet:active {
+    transform: scale(0.99);
+  }
+
+  /* Editorial blocks that answer to the pointer: a hairline of accent comes up
+     to meet the cursor, and the block settles a fraction higher. Border colour
+     and transform only — no background wash, no reflow. */
+  .rise {
+    transition:
+      transform 180ms cubic-bezier(0.22, 1, 0.36, 1),
+      border-color 180ms ease;
+  }
+  .rise:hover {
+    transform: translate3d(0, -2px, 0);
+    border-color: color-mix(in oklab, var(--primary) 32%, var(--border));
+  }
+
+  /* Expandable "Why?" content. Animating grid rows gives a real height
+     transition without measuring anything in JavaScript. */
+  .expand {
+    display: grid;
+    grid-template-rows: 0fr;
+    opacity: 0;
+    transition:
+      grid-template-rows 260ms cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 200ms ease;
+  }
+  .expand > * {
+    overflow: hidden;
+  }
+  .expand[data-open="true"] {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+
+  /* Fields warm towards the accent as focus arrives, instead of snapping. */
+  .field {
+    transition:
+      border-color 160ms ease,
+      background-color 160ms ease,
+      box-shadow 160ms ease;
+  }
+  .field:hover:not(:focus) {
+    border-color: color-mix(in oklab, var(--border) 68%, var(--primary));
+  }
+  .field:focus,
+  .field:focus-visible {
+    outline: none;
+    border-color: color-mix(in oklab, var(--primary) 52%, var(--border));
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--primary) 13%, transparent);
+  }
+
+  /* Motion is felt, not seen. One gentle entrance, nothing that bounces. */
+  @keyframes calm-reveal {
+    from {
+      opacity: 0;
+      transform: translate3d(0, 6px, 0);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes calm-fade {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  .animate-calm-reveal {
+    animation: calm-reveal 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .animate-calm-fade {
+    animation: calm-fade 0.4s ease-out both;
+  }
+  .stagger > * {
+    animation: calm-reveal 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .stagger > *:nth-child(1) { animation-delay: 0.02s; }
+  .stagger > *:nth-child(2) { animation-delay: 0.06s; }
+  .stagger > *:nth-child(3) { animation-delay: 0.1s; }
+  .stagger > *:nth-child(4) { animation-delay: 0.14s; }
+  .stagger > *:nth-child(5) { animation-delay: 0.18s; }
+  .stagger > *:nth-child(6) { animation-delay: 0.22s; }
+  .stagger > *:nth-child(n + 7) { animation-delay: 0.26s; }
+
+  /* Stage hand-off. The outgoing panel leaves upward, the incoming panel
+     rises into place: same workspace, next part of it. Plays on every switch
+     because the panel restarts when it goes from display:none to visible. */
+  @keyframes stage-leave {
+    from {
+      opacity: 1;
+      transform: none;
+    }
+    to {
+      opacity: 0;
+      transform: translate3d(0, -10px, 0);
+    }
+  }
+  @keyframes stage-enter {
+    from {
+      opacity: 0;
+      transform: translate3d(0, 14px, 0);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  .stage-enter {
+    animation: stage-enter 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .stage-leave {
+    animation: stage-leave 160ms cubic-bezier(0.4, 0, 1, 1) both;
+  }
+
+  /* Scroll reveal. Starts hidden, resolves once the element is on screen and
+     then stays resolved — content is never re-animated on the way back up. */
+  @keyframes reveal-in {
+    from {
+      opacity: 0;
+      transform: translate3d(0, 16px, 0);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  .reveal {
+    opacity: 0;
+    transform: translate3d(0, 16px, 0);
+  }
+  .reveal[data-shown="true"] {
+    animation: reveal-in 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-delay: var(--reveal-delay, 0ms);
+  }
+
+  /* The checkmark that confirms something actually landed. */
+  @keyframes check-draw {
+    from {
+      stroke-dashoffset: 22;
+      opacity: 0.4;
+    }
+    to {
+      stroke-dashoffset: 0;
+      opacity: 1;
+    }
+  }
+  .check-draw {
+    stroke-dasharray: 22;
+    stroke-dashoffset: 22;
+    animation: check-draw 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  @keyframes check-pop {
+    from {
+      opacity: 0;
+      transform: scale(0.85);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  .check-pop {
+    animation: check-pop 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  /* The mark traces itself once, then rests. */
+  @keyframes mark-trace {
+    from {
+      stroke-dashoffset: var(--mark-length, 96);
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+  .mark-path--trace {
+    stroke-dasharray: var(--mark-length, 96);
+    animation: mark-trace 1800ms cubic-bezier(0.33, 0.9, 0.4, 1) both;
+  }
+  @keyframes mark-seed-in {
+    from {
+      opacity: 0;
+      transform: scale(0.4);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  .mark-seed--trace {
+    opacity: 0;
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: mark-seed-in 320ms cubic-bezier(0.22, 1, 0.36, 1) 1500ms both;
+  }
+  /* A slow breath on the resting mark: continuity, not a spinner. */
+  @keyframes mark-breathe {
+    0%,
+    100% {
+      opacity: 0.55;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.35);
+    }
+  }
+  .mark-seed--live {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: mark-breathe 2600ms ease-in-out 2200ms infinite;
+  }
+
+  /* The thread that ties the landing story together and the rail progress
+     line: a quiet signal that one idea runs through everything. */
+  .thread-line {
+    background: linear-gradient(
+      180deg,
+      transparent,
+      color-mix(in oklab, var(--primary) 45%, transparent) 18%,
+      color-mix(in oklab, var(--primary) 45%, transparent) 82%,
+      transparent
+    );
+  }
+
+  /* Reveal children in order, one after another, with no JavaScript. */
+  .sequence > * {
+    animation: reveal-in 460ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .sequence > *:nth-child(1) { animation-delay: 0.04s; }
+  .sequence > *:nth-child(2) { animation-delay: 0.16s; }
+  .sequence > *:nth-child(3) { animation-delay: 0.28s; }
+  .sequence > *:nth-child(4) { animation-delay: 0.4s; }
+  .sequence > *:nth-child(5) { animation-delay: 0.52s; }
+  .sequence > *:nth-child(6) { animation-delay: 0.64s; }
+  .sequence > *:nth-child(n + 7) { animation-delay: 0.76s; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  /* Content must be identical without motion: nothing stays hidden. */
+  .reveal {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .reveal[data-shown="true"] {
+    animation: none !important;
+  }
+  .mark-path--trace {
+    stroke-dasharray: none;
+    animation: none !important;
+  }
+  .mark-seed--trace,
+  .mark-seed--live {
+    opacity: 1;
+    animation: none !important;
+  }
+  .check-draw {
+    stroke-dasharray: none;
+    stroke-dashoffset: 0;
+    animation: none !important;
+  }
+  .check-pop,
+  .sequence > *,
+  .stage-enter,
+  .stage-leave {
+    animation: none !important;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
   }
 }

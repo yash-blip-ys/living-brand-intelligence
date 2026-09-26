@@ -16,6 +16,7 @@ import {
 } from "@/app/actions/interview";
 import type { ContextItem } from "@/lib/types/database";
 import type { UnderstandingLine } from "@/lib/ai/dialogue";
+import { ConfirmCheck } from "@/app/components/confirm-check";
 
 type Props = {
   startupId: string;
@@ -66,9 +67,9 @@ const TYPE_HELP: Record<ContextType, string> = {
 };
 
 const TYPE_STYLE: Record<ContextType, string> = {
-  FACT: "border-foreground bg-foreground text-background",
-  INFERENCE: "border-border bg-transparent text-foreground",
-  HYPOTHESIS: "border-dashed border-border bg-transparent text-muted-foreground",
+  FACT: "border-foreground/25 text-foreground",
+  INFERENCE: "border-border text-muted-foreground",
+  HYPOTHESIS: "border-dashed border-border text-muted-foreground",
 };
 
 function toLocalActive(items: ContextItem[]): LocalActiveItem[] {
@@ -94,7 +95,7 @@ function toLocalActive(items: ContextItem[]): LocalActiveItem[] {
 function TypeBadge({ type }: { type: ContextType }) {
   return (
     <span
-      className={`inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full border ${TYPE_STYLE[type]}`}
+      className={`inline-flex items-center text-[0.78rem] px-2.5 py-0.5 rounded-full border ${TYPE_STYLE[type]}`}
     >
       {TYPE_LABEL[type]}
     </span>
@@ -102,17 +103,11 @@ function TypeBadge({ type }: { type: ContextType }) {
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
-  return (
-    <h3 className="text-xl font-semibold tracking-tight text-foreground">{children}</h3>
-  );
+  return <h3 className="display text-[1.6rem] leading-tight">{children}</h3>;
 }
 
 function MicroLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-      {children}
-    </span>
-  );
+  return <span className="eyebrow">{children}</span>;
 }
 
 /* ----------------------------- buttons ----------------------------- */
@@ -123,7 +118,7 @@ function ContinueInterviewButton({ disabled }: { disabled?: boolean }) {
     <button
       type="submit"
       disabled={disabled || pending}
-      className="inline-flex h-12 items-center justify-center rounded-full bg-foreground px-7 text-[15px] font-medium text-background transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50 disabled:cursor-not-allowed"
+      className="inline-flex h-11 items-center justify-center rounded-full border border-foreground bg-foreground px-6 text-sm font-medium text-background transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 disabled:opacity-50 disabled:cursor-not-allowed"
     >
       {pending ? "Thinking…" : "Continue"}
     </button>
@@ -136,7 +131,7 @@ function QuickAnalysisButton() {
     <button
       type="submit"
       disabled={pending}
-      className="inline-flex h-10 items-center justify-center rounded-full border border-border bg-transparent px-5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground hover:border-foreground/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 disabled:opacity-50 disabled:cursor-not-allowed"
+      className="inline-flex h-10 items-center justify-center rounded-full border border-border bg-transparent px-5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground hover:border-foreground/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/25 disabled:opacity-50 disabled:cursor-not-allowed"
     >
       {pending ? "Analyzing…" : "Skip the interview · analyze my idea"}
     </button>
@@ -149,7 +144,7 @@ function ScopeAnswerButton({ disabled }: { disabled?: boolean }) {
     <button
       type="submit"
       disabled={disabled || pending}
-      className="inline-flex h-10 items-center justify-center rounded-full border border-foreground bg-foreground px-5 text-sm font-medium text-background transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/40 disabled:opacity-50 disabled:cursor-not-allowed"
+      className="inline-flex h-10 items-center justify-center rounded-full border border-border bg-transparent px-5 text-sm font-medium text-foreground transition-colors hover:border-foreground/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/25 disabled:opacity-50 disabled:cursor-not-allowed"
     >
       {pending ? "Updating…" : "Answer"}
     </button>
@@ -162,7 +157,7 @@ function ConfirmButton() {
     <button
       type="submit"
       disabled={pending}
-      className="inline-flex h-9 items-center justify-center rounded-full border border-foreground bg-foreground px-4 text-sm font-medium text-background transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/40 disabled:opacity-50 disabled:cursor-not-allowed"
+      className="inline-flex h-10 items-center justify-center rounded-full border border-foreground bg-foreground px-4 text-sm font-medium text-background transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 disabled:opacity-50 disabled:cursor-not-allowed"
     >
       {pending ? "Confirming…" : "Confirm"}
     </button>
@@ -171,13 +166,10 @@ function ConfirmButton() {
 
 function ConfirmedButton() {
   return (
-    <button
-      type="button"
-      disabled
-      className="inline-flex h-9 items-center justify-center gap-1.5 rounded-full border border-foreground bg-foreground px-4 text-sm font-medium text-background opacity-90 cursor-default"
-    >
-      ✓ Confirmed
-    </button>
+    <span className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-primary/25 bg-accent/50 px-4 text-sm font-medium text-accent-foreground">
+      <ConfirmCheck className="text-primary" />
+      Confirmed
+    </span>
   );
 }
 
@@ -187,7 +179,7 @@ function SaveCorrectionButton() {
     <button
       type="submit"
       disabled={pending}
-      className="inline-flex h-9 items-center justify-center rounded-full border border-foreground bg-foreground px-4 text-sm font-medium text-background transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/40 disabled:opacity-50 disabled:cursor-not-allowed"
+      className="inline-flex h-10 items-center justify-center rounded-full border border-foreground bg-foreground px-4 text-sm font-medium text-background transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 disabled:opacity-50 disabled:cursor-not-allowed"
     >
       {pending ? "Saving…" : "Save correction"}
     </button>
@@ -200,7 +192,7 @@ function RejectButton() {
     <button
       type="submit"
       disabled={pending}
-      className="inline-flex h-9 items-center justify-center rounded-full border border-border bg-transparent px-4 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground hover:border-foreground/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 disabled:opacity-50 disabled:cursor-not-allowed"
+      className="inline-flex h-10 items-center justify-center rounded-full border border-border bg-transparent px-4 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground hover:border-foreground/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/25 disabled:opacity-50 disabled:cursor-not-allowed"
     >
       {pending ? "Rejecting…" : "Reject"}
     </button>
@@ -218,7 +210,7 @@ function QuietButton({
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex h-10 items-center justify-center rounded-full border border-border bg-transparent px-5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground hover:border-foreground/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30"
+      className="inline-flex h-10 items-center justify-center rounded-full border border-border bg-transparent px-5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground hover:border-foreground/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/25"
     >
       {children}
     </button>
@@ -231,7 +223,7 @@ function QuietButtonFallback({ children }: { children: React.ReactNode }) {
     <button
       type="submit"
       disabled={pending}
-      className="inline-flex h-10 items-center justify-center rounded-full border border-border bg-transparent px-5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground hover:border-foreground/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 disabled:opacity-50"
+      className="inline-flex h-10 items-center justify-center rounded-full border border-border bg-transparent px-5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground hover:border-foreground/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/25 disabled:opacity-50"
     >
       {pending ? "Thinking…" : children}
     </button>
@@ -290,50 +282,49 @@ function ReviewItemCard({
 
   return (
     <li
-      className={`rounded-2xl border bg-card text-card-foreground transition-colors ${
+      className={`rise space-y-3 border-l-2 pl-5 transition-colors sm:pl-6 ${
         item.state === "approved"
-          ? "border-foreground/25"
+          ? "border-foreground/30"
           : item.state === "rejected"
             ? "border-border opacity-60"
-            : "border-border hover:border-foreground/25"
+            : "border-border/70 hover:border-foreground/30"
       }`}
     >
-      <div className="p-5 sm:p-6 space-y-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <TypeBadge type={item.type} />
-          <span className="text-sm text-muted-foreground">{TYPE_HELP[item.type]}</span>
-          {item.confidence !== null && (
-            <span className="text-sm text-muted-foreground">
-              · {Math.round(item.confidence * 100)}% confidence
-            </span>
-          )}
-          {item.state === "approved" && (
-            <span className="text-sm text-foreground">· Confirmed</span>
-          )}
-          {item.state === "rejected" && (
-            <span className="text-sm text-muted-foreground">· Rejected</span>
-          )}
-        </div>
-
-        {correcting ? (
-          <textarea
-            value={correction}
-            onChange={(e) => setCorrection(e.target.value)}
-            rows={4}
-            className="w-full rounded-xl border border-foreground/30 bg-background px-4 py-3 text-[15px] leading-relaxed text-foreground outline-none focus-visible:ring-2 focus-visible:ring-foreground/30"
-            aria-label="Corrected statement"
-          />
-        ) : (
-          <p className="text-[16px] leading-relaxed text-foreground whitespace-pre-wrap">
-            {item.content}
-          </p>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+        <TypeBadge type={item.type} />
+        <span className="text-[0.85rem] text-muted-foreground">{TYPE_HELP[item.type]}</span>
+        {item.confidence !== null && (
+          <span className="text-[0.85rem] text-muted-foreground/80 tabular-nums">
+            {Math.round(item.confidence * 100)}% confidence
+          </span>
         )}
-
-        {item.reasoning && (
-          <p className="text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap border-l-2 border-border pl-3">
-            {item.reasoning}
-          </p>
+        {item.state === "approved" && (
+          <span className="text-[0.85rem] text-foreground">Confirmed</span>
         )}
+        {item.state === "rejected" && (
+          <span className="text-[0.85rem] text-muted-foreground">Rejected</span>
+        )}
+      </div>
+
+      {correcting ? (
+        <textarea
+          value={correction}
+          onChange={(e) => setCorrection(e.target.value)}
+          rows={4}
+          className="w-full rounded-2xl border border-border/80 bg-card px-4 py-3.5 text-[1rem] leading-relaxed text-foreground outline-none focus:border-primary/40 focus-visible:ring-2 focus-visible:ring-primary/20"
+          aria-label="Corrected statement"
+        />
+      ) : (
+        <p className="text-[1.02rem] leading-[1.7] text-foreground/90 whitespace-pre-wrap">
+          {item.content}
+        </p>
+      )}
+
+      {item.reasoning && (
+        <p className="text-[0.9rem] leading-relaxed text-muted-foreground whitespace-pre-wrap">
+          {item.reasoning}
+        </p>
+      )}
 
         {item.state === "approved" && (
           <div className="flex flex-wrap items-center gap-3 pt-1">
@@ -400,8 +391,7 @@ function ReviewItemCard({
           </div>
         )}
 
-        {reviewError && <p className="text-sm text-destructive">{reviewError}</p>}
-      </div>
+        {reviewError && <p className="text-[0.9rem] text-destructive">{reviewError}</p>}
     </li>
   );
 }
@@ -420,15 +410,15 @@ const UNCERTAINTY_REPLIES = [
 function UnderstandingPanel({ lines }: { lines?: UnderstandingLine[] }) {
   if (!lines || lines.length === 0) return null;
   return (
-    <div className="rounded-2xl border border-border bg-muted/20 p-5 space-y-2">
+    <div className="space-y-3">
       <MicroLabel>What I&apos;m understanding</MicroLabel>
-      <ul className="space-y-1.5">
+      <ul className="space-y-2 border-l border-border/60 pl-5">
         {lines.map((line, idx) => (
           <li
             key={idx}
-            className="text-[15px] leading-relaxed text-foreground/90 flex gap-2"
+            className="text-[0.98rem] leading-relaxed text-foreground/90 flex gap-3"
           >
-            <span aria-hidden className={line.status === "open" ? "text-muted-foreground" : "text-emerald-700 dark:text-emerald-400"}>
+            <span aria-hidden className={line.status === "open" ? "text-muted-foreground/60" : "text-primary/70"}>
               {line.status === "open" ? "?" : "✓"}
             </span>
             <span className={line.status === "open" ? "text-muted-foreground" : undefined}>
@@ -444,13 +434,13 @@ function UnderstandingPanel({ lines }: { lines?: UnderstandingLine[] }) {
 function ReplyChips({ onPick }: { onPick: (reply: string) => void }) {
   return (
     <div className="flex flex-wrap items-center gap-2 pt-1">
-      <span className="text-sm text-muted-foreground">Not sure?</span>
+      <span className="text-[0.85rem] text-muted-foreground">Not sure?</span>
       {UNCERTAINTY_REPLIES.map((reply) => (
         <button
           key={reply}
           type="button"
           onClick={() => onPick(reply)}
-          className="inline-flex h-8 items-center rounded-full border border-border px-3 text-sm text-muted-foreground transition-colors hover:text-foreground hover:border-foreground/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/25"
+          className="inline-flex h-9 items-center rounded-full border border-border px-3.5 text-[0.85rem] text-muted-foreground transition-colors hover:text-foreground hover:border-foreground/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/25"
         >
           {reply}
         </button>
@@ -479,7 +469,7 @@ function AnswerBox({
       rows={rows}
       placeholder={placeholder}
       autoFocus={autoFocus}
-      className="w-full rounded-2xl border border-border bg-background px-5 py-4 text-[16px] leading-relaxed text-foreground outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-foreground/40 focus-visible:ring-2 focus-visible:ring-foreground/25"
+                  className="field w-full rounded-2xl border border-border/80 bg-card px-5 py-4 text-[1.02rem] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/60"
     />
   );
 }
@@ -667,86 +657,83 @@ export function DiscoverySection({
   );
 
   return (
-    <section className="space-y-10">
-      <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <SectionTitle>Discovery</SectionTitle>
+    <section className="max-w-3xl">
+      <div className="space-y-3">
+        <p className="eyebrow">Discover</p>
+        <h2 className="display text-[2.1rem] sm:text-[2.5rem] leading-[1.1]">
+          We understand your startup.
+        </h2>
+        <p className="text-[0.98rem] leading-relaxed text-muted-foreground max-w-xl">
+          Before any brand work happens, we listen. I ask only when something is
+          unclear, then read back everything I understood — as facts, what I inferred,
+          and what I am still guessing. You correct me. Only what you confirm becomes
+          context.
+        </p>
         {activeTotal > 0 && (
-          <span className="text-[15px] text-muted-foreground">
+          <p className="text-[0.85rem] text-muted-foreground/80 tabular-nums">
             {activeTotal} approved · {rejectedCount} rejected
-          </span>
+          </p>
         )}
       </div>
 
       {hasRawIdea && (
-        <div className="rounded-2xl border border-border bg-muted/20 p-5 sm:p-6">
+        <div className="mt-10 space-y-2.5 border-l-2 border-border/70 pl-5 sm:pl-6">
           <MicroLabel>Your starting point</MicroLabel>
-          <p className="mt-2 text-[16px] leading-relaxed text-foreground whitespace-pre-wrap">
+          <p className="text-[1.05rem] leading-[1.7] text-foreground/90 whitespace-pre-wrap">
             {roughIdea}
           </p>
         </div>
       )}
 
       {phase === "intro" && (
-        <div className="space-y-6">
-          <div className="rounded-2xl border border-border bg-card text-card-foreground p-6 sm:p-8 space-y-5">
-            <div className="max-w-2xl space-y-2">
-              <h3 className="text-2xl font-semibold tracking-tight">
-                Let&apos;s understand your idea.
-              </h3>
-              <p className="text-[16px] leading-relaxed text-muted-foreground">
-                Start wherever you want. Tell me what you&apos;re trying to build, and
-                I&apos;ll ask questions when something needs clarification.
-              </p>
+        <div className="mt-12 space-y-8">
+          <form action={dispatchInterview} className="space-y-5">
+            <input type="hidden" name="startupId" value={startupId} />
+            <input
+              type="hidden"
+              name="transcript"
+              value={JSON.stringify(conversation)}
+            />
+            <p className="display text-[1.5rem] sm:text-[1.75rem] leading-snug max-w-2xl">
+              {FIRST_QUESTION}
+            </p>
+            <AnswerBox
+              value={answer}
+              onChange={setAnswer}
+              placeholder="Describe your idea in your own words"
+              rows={5}
+              autoFocus
+            />
+            <div className="flex flex-wrap items-center gap-4">
+              <ContinueInterviewButton disabled={answer.trim().length === 0} />
+              <ReplyChips
+                onPick={(reply) =>
+                  setAnswer((prev) => (prev.trim() ? `${prev.trim()} ${reply}` : reply))
+                }
+              />
             </div>
+          </form>
 
-            <form action={dispatchInterview} className="space-y-4">
+          <div className="flex flex-wrap items-center gap-4 border-t border-border/70 pt-6">
+            <form action={dispatchQuick} className="contents">
               <input type="hidden" name="startupId" value={startupId} />
-              <input
-                type="hidden"
-                name="transcript"
-                value={JSON.stringify(conversation)}
-              />
-              <p className="text-[19px] leading-snug font-medium text-foreground">
-                {FIRST_QUESTION}
-              </p>
-              <AnswerBox
-                value={answer}
-                onChange={setAnswer}
-                placeholder="Describe your idea in your own words"
-                rows={5}
-                autoFocus
-              />
-              <div className="flex flex-wrap items-center gap-4">
-                <ContinueInterviewButton disabled={answer.trim().length === 0} />
-                <ReplyChips
-                  onPick={(reply) =>
-                    setAnswer((prev) => (prev.trim() ? `${prev.trim()} ${reply}` : reply))
-                  }
-                />
-              </div>
+              <QuickAnalysisButton />
             </form>
-
-            <div className="flex flex-wrap items-center gap-4 border-t border-border pt-4">
-              <form action={dispatchQuick} className="contents">
-                <input type="hidden" name="startupId" value={startupId} />
-                <QuickAnalysisButton />
-              </form>
-              <span className="text-sm text-muted-foreground">
-                Already know your idea well? Skip the conversation.
-              </span>
-            </div>
-
-            {(interviewState.error || quickState.error) && (
-              <p className="text-[15px] text-destructive whitespace-pre-wrap leading-relaxed">
-                {interviewState.error ?? quickState.error}
-              </p>
-            )}
+            <span className="text-[0.9rem] text-muted-foreground">
+              Already know your idea well? Skip the conversation.
+            </span>
           </div>
+
+          {(interviewState.error || quickState.error) && (
+            <p className="text-[0.95rem] text-destructive whitespace-pre-wrap leading-relaxed">
+              {interviewState.error ?? quickState.error}
+            </p>
+          )}
         </div>
       )}
 
       {phase === "question" && (
-        <form action={dispatchInterview} className="space-y-6">
+        <form action={dispatchInterview} className="mt-12 space-y-8">
           <input type="hidden" name="startupId" value={startupId} />
           <input
             type="hidden"
@@ -759,71 +746,70 @@ export function DiscoverySection({
             value={JSON.stringify(conversation)}
           />
 
-          <div className="rounded-2xl border border-border bg-card text-card-foreground p-6 sm:p-8 space-y-5">
+          <div className="space-y-4">
             <MicroLabel>Discovering your idea</MicroLabel>
-
-            <div className="space-y-2">
-              <p className="text-[19px] leading-snug font-medium text-foreground">
-                {currentQuestion}
-              </p>
-              {questionWhy && (
-                <p className="text-[15px] text-muted-foreground">{questionWhy}</p>
-              )}
-            </div>
-
-            <AnswerBox
-              value={answer}
-              onChange={setAnswer}
-              placeholder="Answer in your own words"
-              autoFocus
-            />
-
-            <div className="flex flex-wrap items-center gap-4">
-              <ContinueInterviewButton disabled={answer.trim().length === 0} />
-              <ReplyChips
-                onPick={(reply) =>
-                  setAnswer((prev) => (prev.trim() ? `${prev.trim()} ${reply}` : reply))
-                }
-              />
-            </div>
-
-            <div className="flex flex-wrap items-center gap-4 border-t border-border pt-4">
-              <QuietButton
-                onClick={() => {
-                  setForceSummary(true);
-                  setAnswer(
-                    answer.trim() || "That's all I can explain for now.",
-                  );
-                }}
-              >
-                I think I&apos;ve said enough — summarize
-              </QuietButton>
-            </div>
-
-            {interviewState.error && (
-              <p className="text-[15px] text-destructive whitespace-pre-wrap leading-relaxed">
-                {interviewState.error}
+            <p className="display text-[1.5rem] sm:text-[1.75rem] leading-snug max-w-2xl">
+              {currentQuestion}
+            </p>
+            {questionWhy && (
+              <p className="text-[0.95rem] leading-relaxed text-muted-foreground max-w-xl">
+                {questionWhy}
               </p>
             )}
           </div>
+
+          <AnswerBox
+            value={answer}
+            onChange={setAnswer}
+            placeholder="Answer in your own words"
+            autoFocus
+          />
+
+          <div className="flex flex-wrap items-center gap-4">
+            <ContinueInterviewButton disabled={answer.trim().length === 0} />
+            <ReplyChips
+              onPick={(reply) =>
+                setAnswer((prev) => (prev.trim() ? `${prev.trim()} ${reply}` : reply))
+              }
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-4 border-t border-border/70 pt-6">
+            <QuietButton
+              onClick={() => {
+                setForceSummary(true);
+                setAnswer(
+                  answer.trim() || "That's all I can explain for now.",
+                );
+              }}
+            >
+              I think I&apos;ve said enough — summarize
+            </QuietButton>
+          </div>
+
+          {interviewState.error && (
+            <p className="text-[0.95rem] text-destructive whitespace-pre-wrap leading-relaxed">
+              {interviewState.error}
+            </p>
+          )}
 
           <UnderstandingPanel lines={interviewState.understanding} />
         </form>
       )}
 
       {phase === "summary" && (
-        <div className="space-y-8">
-          <div className="rounded-2xl border border-foreground/20 bg-card text-card-foreground p-6 sm:p-8 space-y-3">
+        <div className="mt-12 space-y-10">
+          <div className="space-y-3 max-w-2xl">
             <MicroLabel>Here&apos;s what I think I understand</MicroLabel>
             {interviewState.closing && (
-              <p className="text-[16px] leading-relaxed text-muted-foreground">
+              <p className="text-[1rem] leading-[1.7] text-muted-foreground">
                 {interviewState.closing}
               </p>
             )}
-            <h3 className="text-2xl font-semibold tracking-tight">
+            <h3 className="display text-[1.6rem] sm:text-[1.9rem] leading-snug">
               Is this an accurate picture of what you&apos;re building?
             </h3>
-            <p className="text-[16px] leading-relaxed text-muted-foreground max-w-2xl">
+            <p className="text-[0.98rem] leading-relaxed text-muted-foreground">
               I haven&apos;t changed anything yet. Confirm what I got right, correct
               anything I misread, and reject what isn&apos;t true — only what you
               confirm becomes context for the Brand stage.
@@ -833,9 +819,11 @@ export function DiscoverySection({
           <UnderstandingPanel lines={interviewState.understanding} />
 
           {scopeQuestion && (
-            <div className="rounded-2xl border border-foreground/30 bg-card p-6 sm:p-8 space-y-3">
+            <div className="space-y-3 border-l-2 border-border/70 pl-5 sm:pl-6">
               <MicroLabel>One thing I don&apos;t want to assume</MicroLabel>
-              <p className="text-[17px] leading-relaxed text-foreground">{scopeQuestion}</p>
+              <p className="text-[1.05rem] leading-[1.7] text-foreground/90">
+                {scopeQuestion}
+              </p>
               <form action={dispatchInterview} className="space-y-3 pt-1">
                 <input type="hidden" name="startupId" value={startupId} />
                 <input
@@ -851,7 +839,7 @@ export function DiscoverySection({
                   onChange={(e) => setScopeAnswer(e.target.value)}
                   rows={3}
                   placeholder="Tell me how wide the business should be"
-                  className="w-full rounded-xl border border-border bg-background px-4 py-3 text-[15px] leading-relaxed text-foreground outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-foreground/40 focus-visible:ring-2 focus-visible:ring-foreground/25"
+      className="field w-full rounded-2xl border border-border/80 bg-card px-5 py-4 text-[1.02rem] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/60"
                 />
                 <ScopeAnswerButton disabled={scopeAnswer.trim().length === 0} />
               </form>
@@ -863,14 +851,14 @@ export function DiscoverySection({
               const items = groupedItems[bucket];
               if (items.length === 0) return null;
               return (
-                <div key={bucket} className="space-y-4">
-                  <div className="flex items-center gap-3">
+                <div key={bucket} className="space-y-6">
+                  <div className="flex flex-wrap items-center gap-3">
                     <TypeBadge type={bucket} />
-                    <span className="text-[15px] text-muted-foreground">
+                    <span className="text-[0.9rem] text-muted-foreground">
                       {TYPE_HELP[bucket]}
                     </span>
                   </div>
-                  <ul className="space-y-3">
+                  <ul className="space-y-7">
                     {items.map((item) => (
                       <ReviewItemCard
                         key={item.tempId}
@@ -887,13 +875,13 @@ export function DiscoverySection({
               );
             })
           ) : (
-            <p className="text-[15px] text-muted-foreground">
+            <p className="text-[0.95rem] text-muted-foreground">
               Nothing to review yet.
             </p>
           )}
 
-          <div className="flex flex-wrap items-center gap-4">
-            <p className="text-[15px] text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-4 border-t border-border/70 pt-6">
+            <p className="text-[0.95rem] text-muted-foreground">
               {pendingCount > 0
                 ? `${pendingCount} item${pendingCount === 1 ? "" : "s"} still waiting on you.`
                 : "Everything reviewed."}
@@ -907,7 +895,7 @@ export function DiscoverySection({
           </div>
 
           {interviewState.error && (
-            <p className="text-[15px] text-destructive whitespace-pre-wrap leading-relaxed">
+            <p className="text-[0.95rem] text-destructive whitespace-pre-wrap leading-relaxed">
               {interviewState.error}
             </p>
           )}
@@ -915,33 +903,36 @@ export function DiscoverySection({
       )}
 
       {activeTotal > 0 && (
-        <div className="space-y-6">
-          <div className="flex flex-wrap items-baseline justify-between gap-3">
-            <h3 className="text-xl font-semibold tracking-tight">Approved context</h3>
-            <span className="text-[15px] text-muted-foreground">
-              Confirmed by you. Used as the context for the Brand stage.
-            </span>
+        <div className="mt-16 space-y-10">
+          <div className="rule" />
+          <div className="space-y-2">
+            <SectionTitle>Approved context</SectionTitle>
+            <p className="text-[0.95rem] text-muted-foreground max-w-xl">
+              Confirmed by you. This is the context every later decision is built on.
+            </p>
           </div>
           {(["FACT", "INFERENCE", "HYPOTHESIS"] as const).map((bucket) => {
             const items = activeGrouped[bucket];
             if (items.length === 0) return null;
             return (
-              <div key={bucket} className="space-y-3">
+              <div key={bucket} className="space-y-4">
                 <div className="flex items-center gap-3">
                   <TypeBadge type={bucket} />
-                  <span className="text-[15px] text-muted-foreground">{items.length}</span>
+                  <span className="text-[0.85rem] text-muted-foreground/80 tabular-nums">
+                    {items.length}
+                  </span>
                 </div>
-                <ul className="space-y-2">
+                <ul className="space-y-4">
                   {items.map((item) => (
                     <li
                       key={item.id}
-                      className="rounded-2xl border border-border bg-card px-5 py-4"
+                      className="rise space-y-2 border-l-2 border-border/60 pl-5"
                     >
-                      <p className="text-[16px] leading-relaxed text-foreground whitespace-pre-wrap">
+                      <p className="text-[1.02rem] leading-[1.7] text-foreground/90 whitespace-pre-wrap">
                         {item.content}
                       </p>
                       {item.meta.reasoning && (
-                        <p className="mt-2 text-sm leading-relaxed text-muted-foreground border-l-2 border-border pl-3">
+                        <p className="text-[0.9rem] leading-relaxed text-muted-foreground whitespace-pre-wrap">
                           {item.meta.reasoning}
                         </p>
                       )}

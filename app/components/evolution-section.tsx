@@ -24,6 +24,7 @@ import {
   type ReviewState,
 } from "@/app/actions/evolution";
 import { toImpactType } from "@/lib/types/impact-types";
+import { ConfirmCheck } from "@/app/components/confirm-check";
 
 const UUID_PATTERN =
   /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi;
@@ -104,6 +105,24 @@ const STATUS_TONE: Record<ChangeAnalysisStatus, string> = {
   ignored: "border-border text-muted-foreground",
 };
 
+/* Fixed locale and zone: the server and the browser must render the same string,
+   otherwise this client component fails hydration on a locale/timezone mismatch. */
+const TIMESTAMP_FORMAT = new Intl.DateTimeFormat("en-GB", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  timeZone: "UTC",
+});
+
+function formatTimestamp(value: string | null | undefined): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return `${TIMESTAMP_FORMAT.format(date)} UTC`;
+}
+
 function AddContextButton({ disabled }: { disabled?: boolean }) {
   const { pending } = useFormStatus();
   return (
@@ -123,7 +142,7 @@ function AnalyzeButton({ disabled }: { disabled?: boolean }) {
     <button
       type="submit"
       disabled={disabled || pending}
-      className="inline-flex h-9 items-center justify-center rounded-full border border-foreground/30 px-4 text-xs font-medium text-foreground hover:bg-foreground hover:text-background disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+      className="inline-flex h-10 items-center justify-center rounded-full border border-border px-4 text-sm font-medium text-foreground hover:border-foreground/40 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
     >
       {pending ? "Analyzing…" : "Analyze impact"}
     </button>
@@ -136,7 +155,7 @@ function ApproveRevisionButton() {
     <button
       type="submit"
       disabled={pending}
-      className="inline-flex h-8 items-center justify-center rounded-full border border-foreground bg-foreground px-4 text-xs font-medium text-background hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+      className="inline-flex h-11 items-center justify-center rounded-full border border-foreground bg-foreground px-5 text-sm font-medium text-background hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
     >
       {pending ? "Approving…" : "Approve revision"}
     </button>
@@ -149,7 +168,7 @@ function KeepCurrentButton() {
     <button
       type="submit"
       disabled={pending}
-      className="inline-flex h-8 items-center justify-center rounded-full border border-border bg-transparent px-4 text-xs font-medium text-muted-foreground hover:text-foreground hover:border-muted-foreground disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+      className="inline-flex h-11 items-center justify-center rounded-full border border-border bg-transparent px-5 text-sm font-medium text-muted-foreground hover:text-foreground hover:border-muted-foreground disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
     >
       {pending ? "Processing…" : "Keep current"}
     </button>
@@ -162,7 +181,7 @@ function RejectButton() {
     <button
       type="submit"
       disabled={pending}
-      className="inline-flex h-8 items-center justify-center rounded-full border border-border bg-transparent px-4 text-xs font-medium text-destructive hover:border-destructive/60 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+      className="inline-flex h-11 items-center justify-center rounded-full border border-border bg-transparent px-5 text-sm font-medium text-destructive hover:border-destructive/60 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
     >
       {pending ? "Rejecting…" : "Reject analysis"}
     </button>
@@ -206,6 +225,58 @@ function buildImpactDraft(
     proposed_content: decision.content,
     proposed_rationale: decision.rationale ?? "Based on existing decision rationale.",
   };
+}
+
+/* The reasoning path, stated once and then filled in as it happens. Each step is
+   derived from data that already exists: nothing is invented to animate. */
+const REASONING_STEPS = [
+  "New learning",
+  "Impact analysis",
+  "Affected decisions",
+  "Current vs proposed",
+  "Founder approval",
+];
+
+function ReasoningPath({
+  reached,
+  approved,
+}: {
+  /** How many steps have real content behind them. */
+  reached: number;
+  approved: boolean;
+}) {
+  return (
+    <ol className="flex flex-wrap items-center gap-x-2 gap-y-1.5 pt-1">
+      {REASONING_STEPS.map((step, index) => {
+        const done = index < reached;
+        const current = index === reached && !approved;
+        return (
+          <li key={step} className="flex items-center gap-2">
+            <span
+              className={`inline-flex items-center gap-1.5 text-[0.78rem] ${
+                done || current ? "text-foreground" : "text-muted-foreground/60"
+              }`}
+            >
+              <span
+                aria-hidden
+                className={`h-1.5 w-1.5 rounded-full ${
+                  done
+                    ? "bg-primary"
+                    : current
+                      ? "border border-primary bg-primary/25"
+                      : "border border-border"
+                }`}
+              />
+              {step}
+            </span>
+            {index < REASONING_STEPS.length - 1 && (
+              <span aria-hidden className="h-px w-4 bg-border" />
+            )}
+          </li>
+        );
+      })}
+    </ol>
+  );
 }
 
 export function EvolutionSection({
@@ -323,69 +394,57 @@ export function EvolutionSection({
   );
 
   return (
-    <section className="space-y-8">
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-            Evolution
-          </h2>
-          {(pendingAnalyses.length > 0 || historyAnalyses.length > 0) && (
-            <span className="text-xs text-muted-foreground">
-              {pendingAnalyses.length} pending · {historyAnalyses.length} decided
-            </span>
-          )}
-        </div>
+    <section className="space-y-16 max-w-3xl">
+      <div className="space-y-3">
+        <p className="eyebrow">When the startup changes</p>
+        <h2 className="display text-[2.1rem] sm:text-[2.5rem] leading-[1.1]">
+          We did not regenerate your brand. We found what changed.
+        </h2>
+        <p className="text-[0.98rem] leading-relaxed text-muted-foreground max-w-xl">
+          Add what you learned. We will show which decisions it affects, why, and
+          what a targeted revision would look like. You decide whether it happens.
+        </p>
+        {(pendingAnalyses.length > 0 || historyAnalyses.length > 0) && (
+          <p className="text-[0.85rem] text-muted-foreground/80 tabular-nums">
+            {pendingAnalyses.length} awaiting your review · {historyAnalyses.length}{" "}
+            decided
+          </p>
+        )}
       </div>
 
-      <div className="rounded-2xl border border-border bg-card text-card-foreground">
-        <div className="border-b border-border p-6 sm:p-8 space-y-5">
-          <div className="max-w-xl space-y-2">
-            <h3 className="text-xl font-semibold leading-tight tracking-tight">
-              New information
-            </h3>
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              When the startup changes, add the new fact here. The system will
-              compare it against your active brand decisions and flag any that
-              may need review — proposing a specific revised wording.
-            </p>
+      <div className="space-y-6">
+        <form action={dispatchAdd} className="space-y-4">
+          <p className="eyebrow">New learning</p>
+          <textarea
+            name="content"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            rows={3}
+            maxLength={2000}
+            placeholder={`For example: "Students are not the only users anymore. We also want professional developers using the platform for client work."`}
+            className="field w-full rounded-2xl border border-border/80 bg-card px-4 py-3.5 text-[1rem] leading-relaxed text-foreground placeholder:text-muted-foreground/60 resize-none outline-none"
+          />
+          <input type="hidden" name="startupId" value={startupId} />
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span className="text-[0.8rem] text-muted-foreground/80">
+              Stored as a Fact, sourced from you
+            </span>
+            <AddContextButton disabled={!text.trim()} />
           </div>
+          {addState.error && (
+            <p className="text-[0.9rem] text-destructive pt-1">{addState.error}</p>
+          )}
+        </form>
 
-          <form action={dispatchAdd} className="space-y-3">
-            <input type="hidden" name="startupId" value={startupId} />
-            <textarea
-              name="content"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              rows={3}
-              maxLength={2000}
-              placeholder={`For example: "Students are not the only users anymore. We also want professional developers using the platform for client work."`}
-              className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-foreground resize-none"
-            />
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-                Stored as FACT · source FOUNDER_INPUT
-              </span>
-              <AddContextButton disabled={!text.trim()} />
-            </div>
-            {addState.error && (
-              <p className="text-xs text-destructive pt-1">{addState.error}</p>
-            )}
-          </form>
-        </div>
-
-        <div className="p-6 sm:p-8 space-y-4">
-          <div className="flex items-center justify-between">
-            <h4 className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-              Recent founder facts
-            </h4>
-          </div>
+        <div className="space-y-4 pt-4">
+          <p className="eyebrow">What you have told us since</p>
           {facts.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border p-5 text-xs text-muted-foreground leading-relaxed">
-              No new founder context yet. Add something above that might
-              affect the brand, then analyze its impact.
-            </div>
+            <p className="text-[0.95rem] text-muted-foreground leading-relaxed">
+              Nothing new yet. When the startup learns something that changes the
+              brand, it starts here.
+            </p>
           ) : (
-            <ul className="space-y-3">
+            <ul className="space-y-6">
               {facts.map((f) => {
                 const alreadyAnalyzed = localAnalyses.some(
                   (a) => a.source_context_id === f.id,
@@ -393,68 +452,56 @@ export function EvolutionSection({
                 return (
                   <li
                     key={f.id}
-                    className="rounded-xl border border-border p-4 sm:p-5 space-y-3"
+                    className="border-l-2 border-border/70 pl-5 sm:pl-6 space-y-3"
                   >
-                    <div className="flex items-start justify-between gap-4 flex-wrap">
-                      <div className="flex-1 min-w-0 space-y-1.5">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="inline-flex items-center text-[10px] uppercase tracking-widest font-medium px-2 py-0.5 rounded-full border border-foreground/30 text-foreground">
-                            FACT
-                          </span>
-                          <span className="inline-flex items-center text-[10px] uppercase tracking-widest font-medium px-2 py-0.5 rounded-full border border-border text-muted-foreground">
-                            Founder input
-                          </span>
-                          {f.created_at && (
-                            <span className="text-[10px] text-muted-foreground">
-                              {new Date(f.created_at).toLocaleString()}
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap">
-                          {f.content}
-                        </p>
-                      </div>
-                      <form
-                        action={dispatchAnalyze}
-                        className="shrink-0 flex flex-col items-end gap-2"
-                      >
-                        <input
-                          type="hidden"
-                          name="startupId"
-                          value={startupId}
-                        />
-                        <input
-                          type="hidden"
-                          name="sourceContextId"
-                          value={f.id}
-                        />
+                    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                      <span className="eyebrow">Fact</span>
+                      {f.created_at && (
+                        <span className="text-[0.75rem] text-muted-foreground/70">
+                          {formatTimestamp(f.created_at)}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[1.02rem] leading-[1.7] text-foreground/90 whitespace-pre-wrap">
+                      {f.content}
+                    </p>
+                    <form action={dispatchAnalyze} className="pt-1">
+                      <input
+                        type="hidden"
+                        name="startupId"
+                        value={startupId}
+                      />
+                      <input
+                        type="hidden"
+                        name="sourceContextId"
+                        value={f.id}
+                      />
+                      <div className="flex flex-wrap items-center gap-3">
                         <AnalyzeButton
                           disabled={alreadyAnalyzed || pendingAnalyzeFactId === f.id}
                         />
                         {alreadyAnalyzed && (
-                          <span className="text-[10px] text-muted-foreground">
+                          <span className="text-[0.8rem] text-muted-foreground/80">
                             Already analyzed
                           </span>
                         )}
-                      </form>
-                    </div>
+                      </div>
+                    </form>
                   </li>
                 );
               })}
             </ul>
           )}
           {analyzeState.configError && analyzeState.error && (
-            <div className="rounded-xl border border-border bg-muted/40 p-5 space-y-2">
-              <div className="text-[10px] uppercase tracking-[0.18em] font-medium text-foreground">
-                AI not configured
-              </div>
-              <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
+            <div className="rounded-2xl border border-border/80 bg-muted/30 p-5 space-y-2">
+              <div className="eyebrow">AI not configured</div>
+              <p className="text-[0.9rem] text-muted-foreground whitespace-pre-wrap leading-relaxed">
                 {analyzeState.error}
               </p>
             </div>
           )}
           {!analyzeState.configError && analyzeState.error && (
-            <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-5 text-sm text-destructive whitespace-pre-wrap leading-relaxed">
+            <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-5 text-[0.9rem] text-destructive whitespace-pre-wrap leading-relaxed">
               {analyzeState.error}
             </div>
           )}
@@ -462,10 +509,9 @@ export function EvolutionSection({
       </div>
 
       {(pendingAnalyses.length > 0 || historyAnalyses.length > 0) && (
-        <div className="space-y-8">
-          <h3 className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-            Change analyses
-          </h3>
+        <div className="space-y-12">
+          <div className="rule" />
+          <h3 className="eyebrow">Impact analysis</h3>
           {pendingAnalyses.map((a) => (
             <AnalysisCard
               key={a.id}
@@ -599,41 +645,41 @@ function AnalysisCard({
   void _rState;
 
   const isPending = analysis.status === "pending";
+  const approved = analysis.status === "approved";
 
   return (
-    <article className="rounded-2xl border border-border bg-card text-card-foreground overflow-hidden">
-      <header className="border-b border-border p-5 sm:p-6 space-y-3 bg-background/40">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div className="flex-1 min-w-0 space-y-2">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span
-                className={`inline-flex items-center text-[10px] uppercase tracking-widest font-medium px-2 py-0.5 rounded-full border ${STATUS_TONE[analysis.status]}`}
-              >
-                {STATUS_LABEL[analysis.status]}
-              </span>
-              <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-                Change analysis
-              </span>
-            </div>
-            <h4 className="text-base font-semibold leading-snug tracking-tight text-foreground">
-              {humanize(analysis.summary)}
-            </h4>
-            <div className="text-xs text-muted-foreground space-y-1">
-              <div>
-                <span className="uppercase tracking-[0.18em] mr-1.5 text-[10px]">
-                  Triggered by
-                </span>
-                {analysis.source_context_content}
-              </div>
-              {analysis.created_at && (
-                <div>{new Date(analysis.created_at).toLocaleString()}</div>
-              )}
-            </div>
-          </div>
+    /* The analysis is the product's reasoning, so it is allowed to unfold:
+       the summary, then each affected decision, then the call to action —
+       one sequence, each step waiting for the one before it. */
+    <article className="sequence space-y-8">
+      <header className="space-y-3">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <span
+            className={`eyebrow border border-border/80 rounded-full px-2.5 py-0.5 inline-flex items-center gap-1.5 ${STATUS_TONE[analysis.status]}`}
+          >
+            {approved && <ConfirmCheck className="h-2.5 w-2.5" />}
+            {STATUS_LABEL[analysis.status]}
+          </span>
+          {analysis.created_at && (
+            <span className="text-[0.78rem] text-muted-foreground/70">
+              {formatTimestamp(analysis.created_at)}
+            </span>
+          )}
         </div>
+        <h4 className="display text-[1.35rem] sm:text-[1.5rem] leading-snug max-w-2xl">
+          {humanize(analysis.summary)}
+        </h4>
+        <p className="text-[0.9rem] leading-relaxed text-muted-foreground max-w-xl">
+          <span className="text-foreground/70">Triggered by:</span>{" "}
+          {analysis.source_context_content}
+        </p>
+        <ReasoningPath
+          reached={Math.min(analysis.impacts.length > 0 ? 4 : 2, REASONING_STEPS.length - 1)}
+          approved={!isPending}
+        />
       </header>
 
-      <ul className="divide-y divide-border">
+      <ul className="space-y-10 border-l border-border/60 pl-5 sm:pl-8">
         {analysis.impacts.map((imp) => (
           <ImpactItem
             key={imp.impact_id}
@@ -649,10 +695,8 @@ function AnalysisCard({
       </ul>
 
       {isPending && (
-        <footer className="border-t border-border p-5 sm:p-6 space-y-3">
-          <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground mb-2">
-            Founder decision for this analysis
-          </div>
+        <footer className="space-y-3 pt-6 border-t border-border/70">
+          <div className="eyebrow">Your decision</div>
           <div className="flex items-center gap-3 flex-wrap">
             <form action={approveAction} className="contents">
               <input type="hidden" name="startupId" value={startupId} />
@@ -731,7 +775,7 @@ function AnalysisCard({
             </form>
           </div>
           {reviewError && (
-            <p className="text-xs text-destructive">{reviewError}</p>
+            <p className="text-[0.9rem] text-destructive">{reviewError}</p>
           )}
         </footer>
       )}
@@ -775,106 +819,69 @@ function ImpactItem({
   }, [impact.brand_decision_id, decisionsById, allDecisions]);
 
   return (
-    <li className="p-5 sm:p-6 space-y-4">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span
-            className={`inline-flex items-center text-[10px] uppercase tracking-widest font-medium px-2 py-0.5 rounded-full border ${SEVERITY_STYLE[impact.severity]}`}
-          >
+    <li className="rise relative space-y-5">
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <span className={`eyebrow ${SEVERITY_STYLE[impact.severity]}`}>
             {impact.severity} impact
           </span>
           {impact.drift_type && (
-            <span className="inline-flex items-center text-[10px] uppercase tracking-widest font-medium px-2 py-0.5 rounded-full border border-border text-foreground">
-              {driftLabel(impact.drift_type)}
-            </span>
+            <span className="eyebrow">{driftLabel(impact.drift_type)}</span>
           )}
-          <span className="inline-flex items-center text-[10px] uppercase tracking-widest font-medium px-2 py-0.5 rounded-full border border-foreground/20 text-foreground">
+          <span className="text-[0.8rem] text-muted-foreground/80">
             {decisionCategoryLabel(impact.decision_category)}
           </span>
         </div>
-        {historyChain.length > 1 && (
-          <button
-            type="button"
-            onClick={() => setWhyOpen((w) => !w)}
-            className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground hover:text-foreground transition-colors"
-          >
-            {whyOpen ? "Hide history" : `Show history (${historyChain.length})`}
-          </button>
-        )}
-      </div>
-
-      <div>
-        <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground mb-1.5">
-          Why this may need review
-        </div>
-        <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap border-l-2 border-border pl-3">
+        <p className="text-[1rem] leading-[1.7] text-foreground/90 whitespace-pre-wrap">
           {humanize(impact.reason)}
         </p>
       </div>
 
-      {historyChain.length > 1 && whyOpen && (
-        <div className="rounded-xl border border-border p-4 sm:p-5 space-y-3 bg-background/30">
-          <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-            Decision history
+      {historyChain.length > 1 && (
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={() => setWhyOpen((w) => !w)}
+            className="text-[0.82rem] text-muted-foreground hover:text-primary transition-colors underline decoration-border underline-offset-4"
+          >
+            {whyOpen ? "Hide how this decision evolved" : `How this decision evolved (${historyChain.length} versions)`}
+          </button>
+          <div className="expand" data-open={whyOpen ? "true" : "false"}>
+            <div>
+              <ol className="space-y-4 border-l border-border/60 pl-5 pt-4">
+                {historyChain.map((d, i) => (
+                  <li key={d.id} className="space-y-1.5">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <span className="eyebrow">
+                        {i === 0 ? "Current" : d.status === "active" ? "Active" : "Superseded"}
+                      </span>
+                      <span className="text-[0.75rem] text-muted-foreground/70">
+                        {humanize(d.title)}
+                      </span>
+                    </div>
+                    <p className="text-[0.92rem] leading-relaxed text-muted-foreground whitespace-pre-wrap">
+                      {humanize(d.content)}
+                    </p>
+                  </li>
+                ))}
+              </ol>
+            </div>
           </div>
-          <ol className="space-y-3">
-            {historyChain.map((d, i) => (
-              <li key={d.id} className="relative pl-6 space-y-1">
-                <div className="absolute left-0 top-1.5 flex flex-col items-center">
-                  <span className={`w-2 h-2 rounded-full ${i === 0 ? "bg-foreground" : "bg-border"}`} />
-                  {i < historyChain.length - 1 && (
-                    <span className="w-px h-8 bg-border mt-0.5" />
-                  )}
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span
-                    className={`inline-flex items-center text-[10px] uppercase tracking-widest font-medium px-2 py-0.5 rounded-full border ${
-                      d.status === "active"
-                        ? "border-foreground/30 text-foreground"
-                        : "border-border text-muted-foreground"
-                    }`}
-                  >
-                    {d.status}
-                  </span>
-                  {d.supersedes_id && i === 0 && (
-                    <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                      supersedes previous
-                    </span>
-                  )}
-                </div>
-                <h5 className="text-sm font-semibold tracking-tight text-foreground">
-                  {humanize(d.title)}
-                </h5>
-                <p className="text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap">
-                  {humanize(d.content)}
-                </p>
-              </li>
-            ))}
-          </ol>
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="rounded-xl border border-border p-4 space-y-2 bg-background/30">
-          <div className="flex items-center justify-between">
-            <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-              Current decision
-            </div>
-            <span className="text-[10px] uppercase tracking-widest border border-foreground/30 rounded-full px-2 py-0.5 text-foreground">
-              Active
-            </span>
-          </div>
-          <h5 className="text-sm font-semibold text-foreground tracking-tight">
+      <div className="rise space-y-5 border-l-2 border-border/70 pl-5 sm:pl-6">
+        <div className="space-y-2">
+          <div className="eyebrow">Current</div>
+          <h5 className="text-[1.05rem] leading-snug text-foreground">
             {humanize(impact.decision_title)}
           </h5>
-          <p className="text-xs leading-relaxed text-foreground whitespace-pre-wrap">
+          <p className="text-[0.95rem] leading-relaxed text-muted-foreground whitespace-pre-wrap">
             {humanize(impact.decision_content)}
           </p>
           {impact.decision_rationale && (
-            <p className="text-[11px] leading-relaxed text-muted-foreground whitespace-pre-wrap border-l-2 border-border pl-2.5 pt-0.5">
-              <span className="uppercase tracking-[0.18em] mr-1.5 text-[9px]">
-                Why
-              </span>
+            <p className="text-[0.88rem] leading-relaxed text-muted-foreground/85 whitespace-pre-wrap pt-1">
+              <span className="text-foreground/70">Why:</span>{" "}
               {humanize(impact.decision_rationale)}
             </p>
           )}
@@ -885,35 +892,24 @@ function ImpactItem({
           )}
         </div>
 
-        <div className={`rounded-xl border p-4 space-y-2 ${
-          isPending
-            ? "border-foreground/30 bg-foreground/[0.03]"
-            : isHistory
-              ? "border-border bg-background/30 opacity-70"
-              : "border-emerald-600/30 bg-emerald-500/[0.04] dark:bg-emerald-500/[0.08]"
-        }`}>
-          <div className="flex items-center justify-between">
-            <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-              {isPending ? "Proposed revision" : "Result"}
-            </div>
+        <div className="space-y-2 pt-1">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span className="eyebrow">
+              {isPending ? "Proposed" : "Result"}
+            </span>
             {!isPending && !isHistory && (
-              <span className="text-[10px] uppercase tracking-widest border border-emerald-600/50 text-emerald-700 dark:text-emerald-300 rounded-full px-2 py-0.5">
-                New active
-              </span>
+              <span className="text-[0.8rem] text-primary">Now active</span>
             )}
-
           </div>
-          <h5 className="text-sm font-semibold text-foreground tracking-tight">
+          <h5 className="text-[1.05rem] leading-snug text-foreground">
             {humanize(impact.proposed_title || impact.decision_title)}
           </h5>
-          <p className="text-xs leading-relaxed text-foreground whitespace-pre-wrap">
+          <p className="text-[0.95rem] leading-relaxed text-muted-foreground whitespace-pre-wrap">
             {humanize(impact.proposed_content || impact.decision_content)}
           </p>
           {impact.proposed_rationale && (
-            <p className="text-[11px] leading-relaxed text-muted-foreground whitespace-pre-wrap border-l-2 border-border pl-2.5 pt-0.5">
-              <span className="uppercase tracking-[0.18em] mr-1.5 text-[9px]">
-                Why changed
-              </span>
+            <p className="text-[0.88rem] leading-relaxed text-muted-foreground/85 whitespace-pre-wrap pt-1">
+              <span className="text-foreground/70">What changed:</span>{" "}
               {humanize(impact.proposed_rationale)}
             </p>
           )}
@@ -948,34 +944,27 @@ function renderDecisionSupport(
   const ids = linksByDecision.get(decisionId) ?? [];
   if (ids.length === 0) return null;
   return (
-    <div className="flex flex-wrap gap-1.5 pt-1">
-      <span className="text-[9px] uppercase tracking-[0.18em] text-muted-foreground self-center">
-        Supported by
-      </span>
-      {ids.slice(0, 4).map((id) => {
-        const ctx = contextById.get(id);
-        if (!ctx) return null;
-        const label =
-          ctx.content.length > 60
-            ? `${ctx.content.slice(0, 60)}…`
-            : ctx.content;
-        return (
-          <span
-            key={id}
-            title={ctx.content}
-            className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded-full border border-border text-muted-foreground"
-          >
-            <span className="inline-flex items-center text-[8px] uppercase tracking-widest font-medium px-1 py-px rounded-full border border-foreground/30 text-foreground">
-              {String(ctx.type).slice(0, 4)}
-            </span>
-            <span className="max-w-[200px] truncate">{label}</span>
-          </span>
-        );
-      })}
+    <div className="space-y-1.5 pt-1">
+      <p className="eyebrow">Supported by</p>
+      <ul className="space-y-1">
+        {ids.slice(0, 4).map((id) => {
+          const ctx = contextById.get(id);
+          if (!ctx) return null;
+          return (
+            <li
+              key={id}
+              className="text-[0.88rem] leading-relaxed text-muted-foreground/90 flex gap-2"
+            >
+              <span className="text-muted-foreground/50 shrink-0">—</span>
+              <span>{ctx.content}</span>
+            </li>
+          );
+        })}
+      </ul>
       {ids.length > 4 && (
-        <span className="text-[9px] text-muted-foreground self-center">
-          +{ids.length - 4} more
-        </span>
+        <p className="text-[0.8rem] text-muted-foreground/70">
+          +{ids.length - 4} more supporting facts
+        </p>
       )}
     </div>
   );

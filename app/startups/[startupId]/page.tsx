@@ -39,18 +39,17 @@ export default async function StartupWorkspacePage({
     const message =
       err instanceof Error ? err.message : "Failed to load startup.";
     return (
-      <div className="min-h-full flex-1 flex flex-col items-center justify-center bg-zinc-50 dark:bg-black px-6 py-20">
-        <div className="w-full max-w-2xl">
-          <div className="rounded-xl border border-border bg-card text-card-foreground p-8 text-center">
-            <h1 className="text-xl font-semibold mb-2">Could not load workspace</h1>
-            <p className="text-muted-foreground mb-6">{message}</p>
-            <Link
-              href="/"
-              className="inline-flex h-10 items-center justify-center rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-            >
-              Go back home
-            </Link>
-          </div>
+      <div className="min-h-full flex-1 flex flex-col items-center justify-center px-6 py-24">
+        <div className="w-full max-w-xl text-center animate-calm-reveal">
+          <p className="eyebrow mb-4">Something interrupted us</p>
+          <h1 className="display text-[2rem] mb-3">We could not open this workspace</h1>
+          <p className="text-muted-foreground mb-8">{message}</p>
+          <Link
+            href="/"
+            className="inline-flex h-11 items-center justify-center rounded-full bg-primary px-6 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+          >
+            Go back home
+          </Link>
         </div>
       </div>
     );
@@ -126,25 +125,8 @@ export default async function StartupWorkspacePage({
   const challengeCompleted = challengeRun?.status === "complete";
 
   return (
-    <div className="min-h-full flex-1 flex flex-col bg-zinc-50 dark:bg-black">
-      <header className="border-b border-border bg-background/60 backdrop-blur">
-        <div className="mx-auto w-full max-w-5xl px-6 py-4 flex items-center justify-between">
-          <div className="min-w-0">
-            <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground mb-1">
-              Brand workspace
-            </p>
-            <h1 className="text-lg font-semibold tracking-tight truncate">{displayName}</h1>
-          </div>
-          <Link
-            href="/"
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            ← New idea
-          </Link>
-        </div>
-      </header>
-
-      <main className="mx-auto w-full max-w-5xl px-6 py-8 flex-1">
+    <div className="min-h-full flex-1 flex flex-col">
+      <main className="flex-1">
         <StageProgressProvider
           initial={{
             discovery: activeContext.length > 0,
@@ -157,6 +139,7 @@ export default async function StartupWorkspacePage({
         >
         <WorkspaceTabs
           defaultTab="overview"
+          startupName={displayName}
           slots={{
             overview: (
               <OverviewSection
@@ -219,13 +202,6 @@ export default async function StartupWorkspacePage({
         />
         </StageProgressProvider>
       </main>
-
-      <footer className="border-t border-border">
-        <div className="mx-auto w-full max-w-5xl px-6 py-4 text-[10px] uppercase tracking-[0.18em] text-muted-foreground flex items-center justify-between">
-          <span>Living Brand Intelligence</span>
-          <span>MVP · Polished</span>
-        </div>
-      </footer>
     </div>
   );
 }

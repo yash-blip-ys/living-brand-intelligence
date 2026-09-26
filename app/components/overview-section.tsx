@@ -54,26 +54,14 @@ function parseSections(content: string): Record<string, string> {
   return out;
 }
 
-function preview(content: string, max = 160): string {
-  const clean = content.replace(/\s+/g, " ").trim();
-  if (clean.length <= max) return clean;
-  return `${clean.slice(0, max)}…`;
-}
+const TYPE_LABEL: Record<string, string> = {
+  FACT: "Fact",
+  INFERENCE: "Inference",
+  HYPOTHESIS: "Hypothesis",
+};
 
-function TypeBadge({ type }: { type: "FACT" | "INFERENCE" | "HYPOTHESIS" }) {
-  const styles: Record<string, string> = {
-    FACT: "bg-foreground text-background border-foreground",
-    INFERENCE: "bg-transparent text-foreground border-border",
-    HYPOTHESIS:
-      "bg-transparent text-muted-foreground border-border border-dashed",
-  };
-  return (
-    <span
-      className={`inline-flex items-center text-[9px] uppercase tracking-[0.18em] font-medium px-1.5 py-0.5 rounded-full border ${styles[type]}`}
-    >
-      {type}
-    </span>
-  );
+function TypeLabel({ type }: { type: string }) {
+  return <span className="eyebrow">{TYPE_LABEL[type] ?? type}</span>;
 }
 
 export function OverviewSection({
@@ -154,194 +142,159 @@ export function OverviewSection({
   }, [activeContext]);
 
   return (
-    <section className="space-y-8">
-      <div className="rounded-2xl border border-border bg-card text-card-foreground overflow-hidden">
-        <div className="p-6 sm:p-8 border-b border-border space-y-5">
-          <div className="flex items-start justify-between gap-4 flex-wrap">
-            <div className="space-y-2 max-w-2xl">
-              <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-                Startup
-              </p>
-              <h1 className="text-2xl sm:text-3xl font-semibold leading-tight tracking-tight">
-                {startupName || "Untitled startup"}
-              </h1>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-right">
-              <Stat label="Facts" value={counts.facts} />
-              <Stat label="Inferences" value={counts.inferences} />
-              <Stat label="Hypotheses" value={counts.hypotheses} />
-              <Stat
-                label="Active decisions"
-                value={decisionsOnlyActive.length}
-                accent
-              />
-            </div>
-          </div>
-          {roughIdea && (
-            <div className="rounded-xl border border-foreground/10 bg-background/40 p-5 space-y-1.5">
-              <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-                Rough idea
-              </p>
-              <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap">
-                {roughIdea}
-              </p>
-            </div>
-          )}
+    <section className="space-y-20 max-w-3xl">
+      {/* The startup, stated plainly. */}
+      <div>
+        <p className="eyebrow mb-4">Startup</p>
+        <h2 className="display text-[2.4rem] sm:text-[3rem] leading-[1.05]">
+          {startupName || "Untitled startup"}
+        </h2>
+        {roughIdea && (
+          <p className="mt-8 text-[1.15rem] sm:text-[1.25rem] leading-[1.65] text-foreground/90 font-[var(--font-serif)] italic">
+            {roughIdea}
+          </p>
+        )}
+        <p className="mt-10 text-sm text-muted-foreground tabular-nums">
+          {counts.facts} {counts.facts === 1 ? "fact" : "facts"} ·{" "}
+          {counts.inferences} {counts.inferences === 1 ? "inference" : "inferences"} ·{" "}
+          {counts.hypotheses} {counts.hypotheses === 1 ? "hypothesis" : "hypotheses"} ·{" "}
+          {decisionsOnlyActive.length} active{" "}
+          {decisionsOnlyActive.length === 1 ? "decision" : "decisions"}
+        </p>
+      </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
-            <OverviewField
-              label="Audience"
-              body={
-                decisionByCategory.get("AUDIENCE")
-                  ? preview(decisionByCategory.get("AUDIENCE")!.content, 180)
-                  : undefined
-              }
-            />
-            <OverviewField
-              label="Positioning"
-              body={
-                decisionByCategory.get("POSITIONING")
-                  ? preview(decisionByCategory.get("POSITIONING")!.content, 180)
-                  : undefined
-              }
-            />
-            <OverviewField
-              label="Value proposition"
-              body={
-                decisionByCategory.get("VALUE_PROPOSITION")
-                  ? preview(decisionByCategory.get("VALUE_PROPOSITION")!.content, 180)
-                  : undefined
-              }
-            />
-            <OverviewField
-              label="Tagline"
-              body={
-                decisionByCategory.get("TAGLINE")
-                  ? (() => {
-                      const d = decisionByCategory.get("TAGLINE")!;
-                      const secs = parseSections(d.content);
-                      const firstWithBody =
-                        Object.values(secs).find((v) => v && v.trim()) ||
-                        d.content;
-                      return preview(firstWithBody, 140);
-                    })()
-                  : undefined
-              }
-            />
-          </div>
+      <div className="rule" />
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-            <div className="rounded-xl border border-border p-4 bg-background/50 space-y-2">
-              <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-                Personality traits
-              </p>
-              {personalityTraits.length === 0 ? (
-                <p className="text-[11px] text-muted-foreground">
-                  No approved personality decision yet.
-                </p>
-              ) : (
-                <ul className="flex flex-wrap gap-1.5 pt-0.5">
-                  {personalityTraits.map((t, i) => (
-                    <li
-                      key={i}
-                      className="inline-flex items-center rounded-full border border-foreground/20 text-[11px] px-2.5 py-0.5 text-foreground"
-                    >
-                      {t}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-            <div className="rounded-xl border border-border p-4 bg-background/50 space-y-2">
-              <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-                Challenge status
-              </p>
-              <p className="text-sm leading-snug text-foreground">
-                {challengeStatusLabel}
-              </p>
-              <p className="text-[11px] leading-relaxed text-muted-foreground">
-                Open the Challenge tab to detect clichés, weak claims, and
-                contradictions.
-              </p>
-            </div>
-            <div className="rounded-xl border border-border p-4 bg-background/50 space-y-2">
-              <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-                Consistency status
-              </p>
-              <p className="text-sm leading-snug text-foreground">
-                {consistencyStatusLabel}
-              </p>
-              <p className="text-[11px] leading-relaxed text-muted-foreground">
-                Runs 9 cross-check pairs: Audience ↔ Positioning, Personality ↔
-                Voice, Launch ↔ Positioning and more.
-              </p>
-            </div>
+      {/* The brand as a set of decisions, read like a document. */}
+      <div className="space-y-12">
+        <div>
+          <p className="eyebrow mb-3">The brand so far</p>
+          <h3 className="display text-[1.6rem] sm:text-[1.9rem] max-w-2xl leading-snug">
+            {priorityDecisions.length === 0
+              ? "No brand decisions have been approved yet."
+              : "What you have decided, and what it says about you."}
+          </h3>
+        </div>
+
+        {priorityDecisions.length === 0 ? (
+          <p className="text-sm leading-relaxed text-muted-foreground max-w-xl">
+            Open the Brand stage to turn your approved context into grounded
+            decisions. Nothing is decided until you say so.
+          </p>
+        ) : (
+          <div className="stagger space-y-12">
+            {priorityDecisions.map((d) => {
+              const ids = linksByDecision.get(d.id) ?? [];
+              const support = ids
+                .map((id) => contextById.get(id))
+                .filter(Boolean) as ContextItem[];
+              return (
+                <article key={d.id} className="space-y-4">
+                  <div className="flex items-baseline gap-4">
+                    <p className="eyebrow w-40 shrink-0">
+                      {CATEGORY_LABEL[d.category] ?? d.category}
+                    </p>
+                    <h4 className="display text-[1.35rem] leading-snug">
+                      {d.title}
+                    </h4>
+                  </div>
+                  <div className="sm:pl-56 space-y-4">
+                    <p className="text-[0.98rem] leading-[1.75] whitespace-pre-wrap text-foreground/90">
+                      {d.content}
+                    </p>
+                    {support.length > 0 && (
+                      <div className="space-y-2 pt-1">
+                        <p className="eyebrow">Grounded in</p>
+                        <ul className="space-y-1.5">
+                          {support.map((c) => (
+                            <li
+                              key={c.id}
+                              className="text-[0.82rem] leading-relaxed text-muted-foreground flex gap-2"
+                            >
+                              <TypeLabel type={c.type} />
+                              <span className="min-w-0">{c.content}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
           </div>
+        )}
+      </div>
+
+      <div className="rule" />
+
+      {/* How the brand is being held to account. */}
+      <div className="grid gap-10 sm:grid-cols-3">
+        <div className="space-y-3">
+          <p className="eyebrow">Challenge</p>
+          <p className="text-sm leading-relaxed">{challengeStatusLabel}</p>
+          <p className="text-[0.82rem] leading-relaxed text-muted-foreground">
+            Stress-tests the brand for clichés, weak claims, and contradictions.
+          </p>
+        </div>
+        <div className="space-y-3">
+          <p className="eyebrow">Consistency</p>
+          <p className="text-sm leading-relaxed">{consistencyStatusLabel}</p>
+          <p className="text-[0.82rem] leading-relaxed text-muted-foreground">
+            Cross-checks nine decision pairs, from audience to positioning to
+            voice.
+          </p>
+        </div>
+        <div className="space-y-3">
+          <p className="eyebrow">Evolution</p>
+          <p className="text-sm leading-relaxed">
+            {pending > 0
+              ? `${pending} ${pending === 1 ? "analysis" : "analyses"} waiting for your review`
+              : "No changes waiting"}
+          </p>
+          <p className="text-[0.82rem] leading-relaxed text-muted-foreground">
+            {recent
+              ? `Last reviewed: ${recent.summary}`
+              : "When you learn something new, we show which decisions it affects."}
+          </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="rounded-xl border border-border p-5 space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-              Brand intelligence
-            </p>
-            <span className="text-[10px] text-muted-foreground">
-              {pending > 0 ? `${pending} pending` : "No pending changes"}
-            </span>
-          </div>
-          <ul className="space-y-2 text-xs">
-            <MetricRow label="Active facts" value={counts.facts} />
-            <MetricRow label="Active inferences" value={counts.inferences} />
-            <MetricRow label="Active hypotheses" value={counts.hypotheses} />
-            <MetricRow label="Active brand decisions" value={decisionsOnlyActive.length} />
-            <MetricRow
-              label="Recent evolution analyses"
-              value={analyses.length}
-            />
-          </ul>
-        </div>
+      <div className="rule" />
 
-        <div className="md:col-span-2 rounded-xl border border-border p-5 space-y-3">
-          <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-            Core context
+      {/* The context itself, in three registers. */}
+      <div className="space-y-8">
+        <p className="eyebrow">What we know</p>
+        {activeContext.length === 0 ? (
+          <p className="text-sm leading-relaxed text-muted-foreground max-w-xl">
+            Nothing confirmed yet. Discovery turns your rough idea into facts,
+            inferences, and hypotheses you can approve one by one.
           </p>
-          {activeContext.length === 0 ? (
-            <p className="text-xs text-muted-foreground">
-              No approved context yet. Run Discovery to convert the rough idea
-              into structured Facts, Inferences, and Hypotheses.
-            </p>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {(["FACT", "INFERENCE", "HYPOTHESIS"] as const).map((t) => {
-                const items = activeContext.filter((c) => c.type === t);
-                const shown = items.slice(0, 3);
-                if (shown.length === 0) {
-                  return (
-                    <div key={t} className="space-y-2">
-                      <TypeBadge type={t} />
-                      <p className="text-[11px] text-muted-foreground italic">
-                        None yet.
-                      </p>
-                    </div>
-                  );
-                }
-                return (
-                  <div key={t} className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <TypeBadge type={t} />
-                      {items.length > 3 && (
-                        <span className="text-[10px] text-muted-foreground">
-                          +{items.length - 3} more
-                        </span>
-                      )}
-                    </div>
-                    <ul className="space-y-1.5">
+        ) : (
+          <div className="grid gap-10 sm:grid-cols-3">
+            {(["FACT", "INFERENCE", "HYPOTHESIS"] as const).map((t) => {
+              const items = activeContext.filter((c) => c.type === t);
+              const shown = items.slice(0, 3);
+              return (
+                <div key={t} className="space-y-4">
+                  <div className="flex items-baseline gap-2">
+                    <TypeLabel type={t} />
+                    {items.length > 3 && (
+                      <span className="text-[0.7rem] text-muted-foreground/80">
+                        +{items.length - 3} more
+                      </span>
+                    )}
+                  </div>
+                  {shown.length === 0 ? (
+                    <p className="text-[0.82rem] text-muted-foreground italic">
+                      None yet.
+                    </p>
+                  ) : (
+                    <ul className="space-y-3">
                       {shown.map((c) => (
                         <li
                           key={c.id}
-                          className="rounded-lg border border-border px-2.5 py-1.5 text-[11px] leading-relaxed text-foreground"
-                          title={c.content}
+                          className="text-[0.85rem] leading-relaxed text-foreground/85"
                         >
                           {c.content.length > 120
                             ? `${c.content.slice(0, 120)}…`
@@ -349,184 +302,32 @@ export function OverviewSection({
                         </li>
                       ))}
                     </ul>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="rounded-2xl border border-border bg-card text-card-foreground p-6 sm:p-8 space-y-5">
-        <div className="flex items-center justify-between">
-          <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-            Current brand
-          </p>
-          {priorityDecisions.length === 0 && (
-            <span className="text-[10px] text-muted-foreground">
-              Generate strategy first
-            </span>
-          )}
-        </div>
-        {priorityDecisions.length === 0 ? (
-          <p className="text-xs leading-relaxed text-muted-foreground max-w-2xl">
-            No approved brand decisions yet. Go to Strategy to turn the
-            approved context into grounded decisions.
-          </p>
-        ) : (
-          <ul className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {priorityDecisions.map((d) => {
-              const ids = linksByDecision.get(d.id) ?? [];
-              const supportPreview = ids
-                .slice(0, 2)
-                .map((id) => contextById.get(id))
-                .filter(Boolean) as ContextItem[];
-              return (
-                <li
-                  key={d.id}
-                  className="rounded-xl border border-foreground/10 p-4 space-y-2 bg-background/20"
-                >
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="inline-flex items-center text-[9px] uppercase tracking-[0.18em] font-medium px-2 py-0.5 rounded-full border border-foreground/20 text-foreground">
-                      {CATEGORY_LABEL[d.category] ?? d.category}
-                    </span>
-                    <span className="text-[10px] uppercase tracking-[0.18em] border border-border rounded-full px-2 py-0.5 text-muted-foreground">
-                      Active
-                    </span>
-                  </div>
-                  <h3 className="text-sm font-semibold leading-snug">
-                    {d.title}
-                  </h3>
-                  <p className="text-xs leading-relaxed text-foreground whitespace-pre-wrap">
-                    {d.content}
-                  </p>
-                  {supportPreview.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 pt-1">
-                      {supportPreview.map((c) => (
-                        <span
-                          key={c.id}
-                          title={c.content}
-                          className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded-full border border-border text-muted-foreground"
-                        >
-                          <TypeBadge
-                            type={
-                              (c.type === "FACT" ||
-                                c.type === "INFERENCE" ||
-                                c.type === "HYPOTHESIS"
-                                ? c.type
-                                : "FACT") as
-                                | "FACT"
-                                | "INFERENCE"
-                                | "HYPOTHESIS"
-                            }
-                          />
-                          <span className="max-w-[180px] truncate">
-                            {c.content}
-                          </span>
-                        </span>
-                      ))}
-                    </div>
                   )}
-                </li>
+                </div>
               );
             })}
-          </ul>
-        )}
-      </div>
-
-      <div className="rounded-xl border border-border p-5 sm:p-6 space-y-3">
-        <div className="flex items-center justify-between">
-          <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-            Recent evolution
-          </p>
-          {pending > 0 && (
-            <span className="text-[10px] uppercase tracking-[0.18em] border border-foreground/20 rounded-full px-2 py-0.5 text-foreground">
-              {pending} pending review
-            </span>
-          )}
-        </div>
-        {!recent ? (
-          <p className="text-xs text-muted-foreground">
-            No evolution analyses yet. When new founder information changes
-            the startup, Evolution detects which brand decisions need review.
-          </p>
-        ) : (
-          <div className="rounded-lg border border-border p-4 space-y-1.5 bg-background/30">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="inline-flex items-center text-[9px] uppercase tracking-[0.18em] font-medium px-2 py-0.5 rounded-full border border-border text-foreground">
-                {recent.status.toUpperCase()}
-              </span>
-              {recent.created_at && (
-                <span className="text-[10px] text-muted-foreground">
-                  {new Date(recent.created_at).toLocaleString()}
-                </span>
-              )}
-            </div>
-            <p className="text-sm font-medium leading-snug">{recent.summary}</p>
-            <p className="text-[11px] text-muted-foreground whitespace-pre-wrap">
-              Trigger: {
-                activeContext.find((c) => c.id === recent.source_context_item_id)
-                  ?.content ?? "new founder input"
-              }
-            </p>
           </div>
         )}
       </div>
-    </section>
-  );
-}
 
-function Stat({
-  label,
-  value,
-  accent,
-}: {
-  label: string;
-  value: number;
-  accent?: boolean;
-}) {
-  return (
-    <div className="min-w-[72px]">
-      <div
-        className={`text-lg font-semibold leading-none ${accent ? "text-foreground" : "text-foreground/90"}`}
-      >
-        {value}
-      </div>
-      <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground mt-1">
-        {label}
-      </div>
-    </div>
-  );
-}
-
-function OverviewField({
-  label,
-  body,
-}: {
-  label: string;
-  body?: string;
-}) {
-  return (
-    <div className="rounded-xl border border-border p-4 bg-background/50 space-y-2">
-      <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-        {label}
-      </p>
-      {body ? (
-        <p className="text-[12.5px] leading-relaxed text-foreground/90">{body}</p>
-      ) : (
-        <p className="text-[11px] leading-relaxed text-muted-foreground">
-          No approved decision yet.
-        </p>
+      {personalityTraits.length > 0 && (
+        <>
+          <div className="rule" />
+          <div className="space-y-4">
+            <p className="eyebrow">Personality</p>
+            <ul className="flex flex-wrap gap-x-6 gap-y-2">
+              {personalityTraits.map((t, i) => (
+                <li
+                  key={i}
+                  className="text-[0.95rem] text-foreground/85 before:content-['—'] before:mr-2 before:text-muted-foreground/60"
+                >
+                  {t}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </>
       )}
-    </div>
-  );
-}
-
-function MetricRow({ label, value }: { label: string; value: number }) {
-  return (
-    <li className="flex items-center justify-between text-foreground/90 py-0.5">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="font-medium tabular-nums">{value}</span>
-    </li>
+    </section>
   );
 }

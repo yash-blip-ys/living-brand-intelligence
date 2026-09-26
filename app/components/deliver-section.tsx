@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useQualityRuns, useStageProgress } from "@/app/components/stage-progress";
+import { ConfirmCheck } from "@/app/components/confirm-check";
 import type { BrandDecision, BrandDecisionCategory, ContextItem } from "@/lib/types/database";
 import type { DecisionContextSupport } from "@/lib/db/brand-decisions";
 import { resolveContextRefs } from "@/lib/context-refs";
@@ -62,11 +63,7 @@ function byCategorySections(decisions: BrandDecision[], cat: BrandDecisionCatego
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="inline-flex items-center text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-      {children}
-    </span>
-  );
+  return <span className="eyebrow">{children}</span>;
 }
 
 function SectionHeader({
@@ -81,17 +78,17 @@ function SectionHeader({
   copied: boolean;
 }) {
   return (
-    <div className="flex items-end justify-between gap-4 pb-3 border-b border-border mb-4">
-      <div>
+    <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 pb-4 border-b border-border/70">
+      <div className="flex items-baseline gap-4">
         {eyebrow && <SectionLabel>{eyebrow}</SectionLabel>}
-        <h3 className="text-xl font-semibold tracking-tight text-foreground mt-1">
+        <h3 className="display text-[1.6rem] sm:text-[1.8rem] leading-tight">
           {title}
         </h3>
       </div>
       <button
         type="button"
         onClick={onCopy}
-        className="inline-flex h-7 items-center justify-center rounded-full border border-border px-3 text-[10px] uppercase tracking-[0.18em] text-muted-foreground hover:text-foreground hover:border-muted-foreground transition-colors"
+        className="text-[0.8rem] text-muted-foreground hover:text-foreground transition-colors underline decoration-border underline-offset-4 shrink-0"
       >
         {copied ? "Copied" : "Copy section"}
       </button>
@@ -100,17 +97,13 @@ function SectionHeader({
 }
 
 function SubHeading({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground mb-1.5 mt-4 first:mt-0">
-      {children}
-    </p>
-  );
+  return <p className="eyebrow mb-1.5 mt-5 first:mt-0">{children}</p>;
 }
 
 function RichParagraphs({ text }: { text: string }) {
   if (!text) return null;
   return (
-    <div className="text-sm leading-relaxed whitespace-pre-wrap text-foreground">
+    <div className="text-[0.98rem] leading-[1.7] whitespace-pre-wrap text-foreground/90">
       {text}
     </div>
   );
@@ -132,7 +125,7 @@ function Bullets({ text }: { text: string }) {
         return (
           <li
             key={idx}
-            className="text-sm leading-relaxed text-foreground/90 pl-4 relative"
+            className="text-[0.98rem] leading-[1.7] text-foreground/90 pl-4 relative"
           >
             <span className="absolute left-0 text-foreground/30">·</span>
             {clean}
@@ -144,10 +137,12 @@ function Bullets({ text }: { text: string }) {
 }
 
 function SectionBox({ children }: { children: React.ReactNode }) {
+  // Every numbered section settles in turn, so the kit reads as a document
+  // being laid out rather than a list of panels appearing at once. The
+  // animation replays each time the stage is opened, because the stage panel
+  // goes from display:none to visible.
   return (
-    <section className="rounded-2xl border border-border bg-card text-card-foreground p-6 sm:p-8 space-y-1">
-      {children}
-    </section>
+    <article className="sequence pt-12 space-y-1">{children}</article>
   );
 }
 
@@ -394,29 +389,26 @@ export function DeliverSection({
   const { challengeRun, consistencyRun } = useQualityRuns();
 
   return (
-    <section className="space-y-8">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h2 className="text-xs uppercase tracking-[0.18em] text-muted-foreground mb-1">
-            Deliver
-          </h2>
-          <p className="text-sm text-muted-foreground max-w-2xl">
-            Approved decisions assembled into a launch-ready brand kit. Export via
-            Markdown for docs, JSON for programmatic use, or copy individual sections.
-          </p>
-        </div>
+    <section className="max-w-3xl">
+      <div className="space-y-3">
+        <p className="eyebrow">Deliver</p>
+        <h2 className="display text-[2.1rem] sm:text-[2.5rem] leading-[1.1]">
+          Your decisions become a coherent brand.
+        </h2>
+        <p className="text-[0.98rem] leading-relaxed text-muted-foreground max-w-xl">
+          Everything you approved in the Brand stage, assembled into one document.
+          Copy any section, or take the whole kit as Markdown or JSON.
+        </p>
       </div>
 
-      <div className="rounded-2xl border border-border bg-card text-card-foreground p-6 sm:p-8 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-          <div>
+      <div className="mt-10 space-y-4 border-t border-border/70 pt-8">
+        <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-4">
+          <div className="space-y-1.5">
             <SectionLabel>Brand kit</SectionLabel>
-            <h3 className="text-2xl font-semibold tracking-tight mt-1">
-              {startupName}
-            </h3>
-            <p className="text-sm text-muted-foreground mt-1 max-w-xl">
+            <h3 className="display text-[2rem] leading-none">{startupName}</h3>
+            <p className="text-[0.9rem] text-muted-foreground max-w-xl">
               {activeOnly.length === 0
-                ? "Brand kit is empty. Approve some active decisions in the Brand tab first."
+                ? "The kit is empty. Approve active decisions in the Brand stage first."
                 : `${activeOnly.length} approved decision${activeOnly.length === 1 ? "" : "s"} — ${
                     ([
                       "AUDIENCE",
@@ -437,35 +429,35 @@ export function DeliverSection({
                   } go-to-market`}
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+          <div className="flex flex-wrap items-center gap-3 sm:justify-end">
             <button
               type="button"
               onClick={() => doCopy("md", buildMarkdown)}
               disabled={!canExport}
-              className="inline-flex h-10 items-center justify-center rounded-full border border-foreground bg-foreground px-5 text-xs font-medium text-background hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
+              className="inline-flex h-11 items-center justify-center rounded-full border border-foreground bg-foreground px-5 text-sm font-medium text-background hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
             >
-              {copiedMd ? "Markdown copied" : "Copy Brand Kit (Markdown)"}
+              {copiedMd ? "Markdown copied" : "Copy kit (Markdown)"}
             </button>
             <button
               type="button"
               onClick={() => doCopy("json", buildJson)}
               disabled={!canExport}
-              className="inline-flex h-10 items-center justify-center rounded-full border border-border bg-transparent px-5 text-xs font-medium text-foreground hover:bg-muted/40 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="inline-flex h-11 items-center justify-center rounded-full border border-border bg-transparent px-5 text-sm font-medium text-foreground hover:border-foreground/40 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
-              {copiedJson ? "JSON copied" : "Copy Brand Kit (JSON)"}
+              {copiedJson ? "JSON copied" : "Copy kit (JSON)"}
             </button>
           </div>
         </div>
 
         {!canExport && (
-          <div className="rounded-xl border border-amber-600/40 bg-amber-500/[0.04] p-4 text-sm text-amber-700 dark:text-amber-300 space-y-2">
-            There are no approved decisions yet, so there is nothing to export. Approve
-            a decision in the Brand tab first.
-          </div>
+          <p className="text-[0.92rem] leading-relaxed text-muted-foreground max-w-xl">
+            There is nothing to export yet — no decisions have been approved. Approve
+            one in the Brand stage and it will appear here.
+          </p>
         )}
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-4">
         {/* 1. FOUNDATION */}
         <SectionBox>
           <SectionHeader
@@ -484,7 +476,7 @@ export function DeliverSection({
               })
             }
           />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-6 pt-6">
             <div>
               <SubHeading>Problem</SubHeading>
               <RichParagraphs text={roughSentences || "Rough idea not set yet."} />
@@ -495,8 +487,8 @@ export function DeliverSection({
                 text={aud?.content ?? "No approved AUDIENCE decision yet."}
               />
               {aud?.rationale && (
-                <div className="text-[11px] leading-relaxed text-muted-foreground whitespace-pre-wrap border-l-2 border-border pl-2.5 mt-3">
-                  <span className="uppercase tracking-[0.18em] mr-1.5 text-[9px]">Why</span>
+                <div className="text-[0.88rem] leading-relaxed text-muted-foreground whitespace-pre-wrap border-l-2 border-border/60 pl-4 mt-3">
+                  <span className="text-foreground/70 mr-1.5">Why:</span>
                   {resolveContextRefs(aud.rationale, contextById)}
                 </div>
               )}
@@ -530,7 +522,7 @@ export function DeliverSection({
               })
             }
           />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-6 pt-6">
             <div>
               <SubHeading>Positioning</SubHeading>
               <RichParagraphs
@@ -572,7 +564,7 @@ export function DeliverSection({
             }
           />
           {perSec ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 pt-6">
               {"Traits" in perSec && (
                 <div>
                   <SubHeading>Traits</SubHeading>
@@ -612,7 +604,7 @@ export function DeliverSection({
                 ))}
             </div>
           ) : (
-            <div className="text-sm text-muted-foreground pt-2">
+            <div className="text-[0.95rem] leading-relaxed text-muted-foreground pt-4 max-w-xl">
               No approved PERSONALITY decision yet. Generate strategy in the Brand tab and
               approve the personality decision.
             </div>
@@ -650,7 +642,7 @@ export function DeliverSection({
               ))}
             </div>
           ) : (
-            <div className="text-sm text-muted-foreground pt-2">
+            <div className="text-[0.95rem] leading-relaxed text-muted-foreground pt-4 max-w-xl">
               No approved NAMING decision yet.
             </div>
           )}
@@ -684,12 +676,12 @@ export function DeliverSection({
                 </div>
               ))
             ) : (
-              <div className="text-sm text-muted-foreground">
+              <div className="text-[0.95rem] leading-relaxed text-muted-foreground">
                 No approved TAGLINE decision yet.
               </div>
             )}
             {oneLinePitch && (
-              <div className="border-t border-border pt-4">
+              <div className="pt-4">
                 <SubHeading>One-line pitch</SubHeading>
                 <RichParagraphs text={oneLinePitch} />
               </div>
@@ -717,13 +709,13 @@ export function DeliverSection({
               })
             }
           />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 pt-6">
             <div className="space-y-3">
               <SubHeading>Voice</SubHeading>
               {voiceSec ? (
                 Object.entries(voiceSec).map(([k, v]) => (
                   <div key={k}>
-                    <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground mb-1 mt-2 first:mt-0">
+                    <p className="eyebrow mb-1 mt-4 first:mt-0">
                       {k}
                     </p>
                     {k.toLowerCase() === "do" ||
@@ -736,7 +728,7 @@ export function DeliverSection({
                   </div>
                 ))
               ) : (
-                <div className="text-sm text-muted-foreground">
+                <div className="text-[0.95rem] leading-relaxed text-muted-foreground">
                   No approved VOICE decision yet.
                 </div>
               )}
@@ -748,7 +740,7 @@ export function DeliverSection({
                   .filter(([k]) => k !== "One-line pitch")
                   .map(([k, v]) => (
                     <div key={k}>
-                      <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground mb-1 mt-2 first:mt-0">
+                      <p className="eyebrow mb-1 mt-4 first:mt-0">
                         {k}
                       </p>
                       {k.toLowerCase().includes("supporting") ||
@@ -761,7 +753,7 @@ export function DeliverSection({
                     </div>
                   ))
               ) : (
-                <div className="text-sm text-muted-foreground">
+                <div className="text-[0.95rem] leading-relaxed text-muted-foreground">
                   No approved MESSAGING decision yet.
                 </div>
               )}
@@ -785,7 +777,7 @@ export function DeliverSection({
             }
           />
           {visSec ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 pt-6">
               {Object.entries(visSec).map(([k, v]) => (
                 <div key={k}>
                   <SubHeading>{k}</SubHeading>
@@ -798,7 +790,7 @@ export function DeliverSection({
               ))}
             </div>
           ) : (
-            <div className="text-sm text-muted-foreground pt-2">
+            <div className="text-[0.95rem] leading-relaxed text-muted-foreground pt-4 max-w-xl">
               No approved VISUAL DIRECTION decision yet. Brief will appear here after
               approval in the Brand tab.
             </div>
@@ -825,15 +817,15 @@ export function DeliverSection({
               })
             }
           />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
-            <div className="rounded-xl border border-border p-5 space-y-2 bg-background/60">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-6 pt-6">
+            <div className="space-y-2 border-l-2 border-border/60 pl-4">
               <SubHeading>Challenge results</SubHeading>
               {challengeRun === null ? (
                 <>
                   <p className="text-sm text-muted-foreground">
                     Run the Challenge tab to surface defects.
                   </p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-[0.85rem] leading-relaxed text-muted-foreground/85">
                     Status:{" "}
                     <span className="uppercase tracking-[0.18em]">Not run yet</span>
                   </p>
@@ -844,11 +836,11 @@ export function DeliverSection({
                     The last Challenge run did not complete, so no result was recorded.
                   </p>
                   {challengeRun.error && (
-                    <p className="text-xs text-muted-foreground whitespace-pre-wrap">
+                    <p className="text-[0.88rem] leading-relaxed text-muted-foreground whitespace-pre-wrap">
                       {challengeRun.error}
                     </p>
                   )}
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-[0.85rem] leading-relaxed text-muted-foreground/85">
                     Status:{" "}
                     <span className="uppercase tracking-[0.18em]">Unavailable</span>
                   </p>
@@ -865,14 +857,14 @@ export function DeliverSection({
                         } needing review — ${challengeRun.high} high, ${challengeRun.medium} medium, ${challengeRun.low} low.`}
                   </p>
                   {challengeRun.ungrounded > 0 && (
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-[0.85rem] leading-relaxed text-muted-foreground/85">
                       {challengeRun.ungrounded} check
                       {challengeRun.ungrounded === 1 ? "" : "s"} could not be grounded, so
                       no verdict was reported for{" "}
                       {challengeRun.ungrounded === 1 ? "it" : "them"}.
                     </p>
                   )}
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-[0.85rem] leading-relaxed text-muted-foreground/85">
                     Status:{" "}
                     <span className="uppercase tracking-[0.18em]">
                       {challengeRun.issueCount === 0 ? "Complete · 0 issues" : "Complete"}
@@ -881,14 +873,14 @@ export function DeliverSection({
                 </>
               )}
             </div>
-            <div className="rounded-xl border border-border p-5 space-y-2 bg-background/60">
+            <div className="space-y-2 border-l-2 border-border/60 pl-4">
               <SubHeading>Consistency</SubHeading>
               {consistencyRun === null ? (
                 <>
                   <p className="text-sm text-muted-foreground">
                     Run Consistency Guardian in the Challenge tab.
                   </p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-[0.85rem] leading-relaxed text-muted-foreground/85">
                     Status:{" "}
                     <span className="uppercase tracking-[0.18em]">Not run yet</span>
                   </p>
@@ -899,11 +891,11 @@ export function DeliverSection({
                     The last Consistency run did not complete, so no result was recorded.
                   </p>
                   {consistencyRun.error && (
-                    <p className="text-xs text-muted-foreground whitespace-pre-wrap">
+                    <p className="text-[0.88rem] leading-relaxed text-muted-foreground whitespace-pre-wrap">
                       {consistencyRun.error}
                     </p>
                   )}
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-[0.85rem] leading-relaxed text-muted-foreground/85">
                     Status:{" "}
                     <span className="uppercase tracking-[0.18em]">Unavailable</span>
                   </p>
@@ -921,37 +913,37 @@ export function DeliverSection({
                       : ""}
                     .
                   </p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-[0.85rem] leading-relaxed text-muted-foreground/85">
                     Status:{" "}
                     <span className="uppercase tracking-[0.18em]">Complete</span>
                   </p>
                 </>
               )}
             </div>
-            <div className="rounded-xl border border-border p-5 space-y-2 bg-background/60">
+            <div className="space-y-2 border-l-2 border-border/60 pl-4">
               <SubHeading>Unresolved warnings</SubHeading>
               <ul className="space-y-1">
                 {activeOnly.length === 0 && (
-                  <li className="text-sm text-foreground/80 pl-4 relative">
+                  <li className="text-[0.95rem] leading-relaxed text-foreground/80 pl-4 relative">
                     <span className="absolute left-0 text-foreground/30">·</span>
                     Brand kit has no approved decisions yet.
                   </li>
                 )}
                 {!visSec && (
-                  <li className="text-sm text-foreground/80 pl-4 relative">
+                  <li className="text-[0.95rem] leading-relaxed text-foreground/80 pl-4 relative">
                     <span className="absolute left-0 text-foreground/30">·</span>
                     No Visual Direction decision approved.
                   </li>
                 )}
                 {!launchSec && (
-                  <li className="text-sm text-foreground/80 pl-4 relative">
+                  <li className="text-[0.95rem] leading-relaxed text-foreground/80 pl-4 relative">
                     <span className="absolute left-0 text-foreground/30">·</span>
                     Launch copy is missing.
                   </li>
                 )}
                 {activeOnly.length > 0 && visSec && launchSec && (
-                  <li className="text-sm text-emerald-700 dark:text-emerald-300 pl-4 relative">
-                    <span className="absolute left-0 text-emerald-700/60">✓</span>
+                  <li className="text-[0.95rem] leading-relaxed text-muted-foreground pl-4 relative flex items-center gap-2.5">
+                    <ConfirmCheck className="h-3 w-3 shrink-0 text-primary" />
                     No unresolved warnings for available decisions.
                   </li>
                 )}
@@ -978,15 +970,15 @@ export function DeliverSection({
           {launchSec ? (
             <div className="space-y-4 pt-2">
               {"Landing page headline" in launchSec && (
-                <div className="rounded-xl border border-border p-5 bg-background/60 space-y-1">
+                <div className="space-y-1 border-l-2 border-border/60 pl-4">
                   <SubHeading>Landing page · Hero headline</SubHeading>
-                  <p className="text-xl font-semibold tracking-tight leading-snug text-foreground">
+                  <p className="display text-[1.7rem] leading-[1.2] text-foreground">
                     {launchSec["Landing page headline"]}
                   </p>
                 </div>
               )}
               {"Subheadline" in launchSec && (
-                <div className="rounded-xl border border-border p-5 bg-background/60 space-y-1">
+                <div className="space-y-1 border-l-2 border-border/60 pl-4">
                   <SubHeading>Hero subheadline</SubHeading>
                   <RichParagraphs text={launchSec["Subheadline"]} />
                 </div>
@@ -1006,9 +998,9 @@ export function DeliverSection({
                 )}
               </div>
               {"LinkedIn / social launch copy" in launchSec && (
-                <div className="rounded-xl border border-border p-5 sm:p-6 bg-background/60">
+                <div className="border-l-2 border-border/60 pl-4">
                   <SubHeading>LinkedIn / social launch copy</SubHeading>
-                  <div className="text-sm leading-relaxed whitespace-pre-wrap text-foreground pt-1 font-serif">
+                  <div className="text-[1rem] leading-[1.7] whitespace-pre-wrap text-foreground/90 pt-1">
                     {launchSec["LinkedIn / social launch copy"]}
                   </div>
                 </div>
@@ -1032,7 +1024,7 @@ export function DeliverSection({
                 ))}
             </div>
           ) : (
-            <div className="text-sm text-muted-foreground pt-2">
+            <div className="text-[0.95rem] leading-relaxed text-muted-foreground pt-4 max-w-xl">
               No approved LAUNCH decision yet. Approve the Launch category in the Brand
               tab to fill landing headline, CTA, and social copy.
             </div>
@@ -1040,9 +1032,10 @@ export function DeliverSection({
         </SectionBox>
       </div>
 
-      <p className="text-center text-[10px] uppercase tracking-[0.18em] text-muted-foreground pt-4">
-        {CATEGORY_LABEL.AUDIENCE} · {CATEGORY_LABEL.POSITIONING} · {CATEGORY_LABEL.PERSONALITY}{" "}
-        · {CATEGORY_LABEL.NAMING} · {CATEGORY_LABEL.TAGLINE} · {CATEGORY_LABEL.VOICE} ·{" "}
+      <p className="pt-10 text-[0.82rem] text-muted-foreground/70">
+        {CATEGORY_LABEL.AUDIENCE} · {CATEGORY_LABEL.POSITIONING} ·{" "}
+        {CATEGORY_LABEL.PERSONALITY} · {CATEGORY_LABEL.NAMING} ·{" "}
+        {CATEGORY_LABEL.TAGLINE} · {CATEGORY_LABEL.VOICE} ·{" "}
         {CATEGORY_LABEL.MESSAGING} · {CATEGORY_LABEL.VISUAL_DIRECTION} ·{" "}
         {CATEGORY_LABEL.LAUNCH}
       </p>

@@ -29,6 +29,7 @@ import { useStageProgress } from "@/app/components/stage-progress";import type {
 import type { BrandEvaluation } from "@/lib/ai/evaluation/evaluator";
 import type { DecisionContextSupport } from "@/lib/db/brand-decisions";
 import { summarizeChallengeRun } from "@/lib/challenge-run";
+import { ConfirmCheck } from "@/app/components/confirm-check";
 
 type Props = {
   startupId: string;
@@ -102,31 +103,26 @@ const bindRevisionReject = async (
 function EvaluationPanel({ evaluation }: { evaluation?: BrandEvaluation }) {
   if (!evaluation) return null;
   return (
-    <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-1">
-      <div className="flex flex-wrap items-center gap-2">
-        <SectionLabel>Decision evaluation</SectionLabel>
-        <span
-          className={`inline-flex items-center text-[10px] uppercase tracking-[0.18em] border rounded-full px-2 py-0.5 font-medium ${
-            EVALUATION_STYLE[evaluation.verdict] ?? EVALUATION_STYLE.PASS
-          }`}
-        >
+    <div className="space-y-1.5 border-l-2 border-border/60 pl-4">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+        <SectionLabel>Second opinion</SectionLabel>
+        <span className={`eyebrow rounded-full border px-2 py-0.5 ${EVALUATION_STYLE[evaluation.verdict] ?? EVALUATION_STYLE.PASS}`}>
           {evaluation.verdict.replace("_", " ")}
         </span>
-        <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+        <span className="text-[0.78rem] text-muted-foreground/80">
           {evaluation.provider === "jev" ? "TypeSafe Jev" : "Gemini"}
+          {evaluation.confidence !== null
+            ? ` · ${Math.round(evaluation.confidence * 100)}% confidence`
+            : ""}
         </span>
-        {evaluation.confidence !== null && (
-          <span className="text-[10px] text-muted-foreground">
-            {Math.round(evaluation.confidence * 100)}% confidence
-          </span>
-        )}
       </div>
-      <p className="text-xs leading-relaxed text-foreground whitespace-pre-wrap pt-1">
+      <p className="text-[0.9rem] leading-relaxed text-muted-foreground whitespace-pre-wrap">
         {evaluation.explanation}
       </p>
       {evaluation.revisionGuidance && (
-        <p className="text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap">
-          Bounded revision direction: {evaluation.revisionGuidance}
+        <p className="text-[0.88rem] leading-relaxed text-muted-foreground/85 whitespace-pre-wrap">
+          <span className="text-foreground/70">Where to revise:</span>{" "}
+          {evaluation.revisionGuidance}
         </p>
       )}
     </div>
@@ -187,18 +183,17 @@ function WorkflowDisclosure({
 function UngroundedChecks({ checks }: { checks: BrandCheck[] }) {
   if (checks.length === 0) return null;
   return (
-    <details className="rounded-xl border border-dashed border-border bg-muted/20 p-4 text-xs text-muted-foreground">
-      <summary className="cursor-pointer select-none">
-        {checks.length} check{checks.length > 1 ? "s" : ""} could not be grounded — no verdict, nothing changed
+    <details className="space-y-3 text-[0.88rem] text-muted-foreground">
+      <summary className="cursor-pointer select-none marker:text-muted-foreground/60">
+        {checks.length} check{checks.length > 1 ? "s" : ""} could not be grounded — no
+        verdict, nothing changed
       </summary>
-      <ul className="mt-3 space-y-2">
+      <ul className="mt-3 space-y-3 border-l border-border/60 pl-4">
         {checks.map((check) => (
-          <li key={check.id} className="space-y-1">
-            <div className="flex flex-wrap items-center gap-2">
+          <li key={check.id} className="space-y-1.5">
+            <div className="flex flex-wrap items-center gap-3">
               <CategoryBadge cat={check.decision_category as BrandDecisionCategory} />
-              <span className="text-[10px] uppercase tracking-[0.18em]">
-                {checkLabel(check.check_type)}
-              </span>
+              <span className="eyebrow">{checkLabel(check.check_type)}</span>
             </div>
             {check.reason && <p className="leading-relaxed">{check.reason}</p>}
             {check.evidence.length > 0 && (
@@ -214,11 +209,7 @@ function UngroundedChecks({ checks }: { checks: BrandCheck[] }) {
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-      {children}
-    </span>
-  );
+  return <span className="eyebrow">{children}</span>;
 }
 
 function CategoryBadge({ cat }: { cat: BrandDecisionCategory }) {
@@ -236,7 +227,7 @@ function CategoryBadge({ cat }: { cat: BrandDecisionCategory }) {
     LAUNCH: "Launch",
   };
   return (
-    <span className="inline-flex items-center text-[10px] uppercase tracking-[0.18em] border border-border px-2 py-0.5 rounded-full text-muted-foreground bg-background">
+    <span className="inline-flex items-center text-[0.78rem] border border-border/80 rounded-full px-2.5 py-0.5 text-muted-foreground">
       {labels[cat] ?? cat}
     </span>
   );
@@ -261,7 +252,7 @@ function ConsistencyButton() {
     <button
       type="submit"
       disabled={pending}
-      className="inline-flex h-9 items-center justify-center rounded-full border border-border bg-background px-4 text-xs font-medium text-foreground hover:bg-muted/40 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+      className="inline-flex h-10 items-center justify-center rounded-full border border-border px-4 text-sm font-medium text-foreground hover:border-foreground/40 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
     >
       {pending ? "Checking consistency…" : "Run consistency check"}
     </button>
@@ -274,7 +265,7 @@ function KeepButton() {
     <button
       type="submit"
       disabled={pending}
-      className="inline-flex h-8 items-center justify-center rounded-full border border-border bg-background px-4 text-xs font-medium text-muted-foreground hover:text-foreground hover:border-muted-foreground disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+      className="inline-flex h-10 items-center justify-center rounded-full border border-border bg-transparent px-4 text-sm font-medium text-muted-foreground hover:text-foreground hover:border-foreground/40 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
     >
       {pending ? "Dismissing…" : "Keep"}
     </button>
@@ -287,7 +278,7 @@ function RejectDecisionButton() {
     <button
       type="submit"
       disabled={pending}
-      className="inline-flex h-8 items-center justify-center rounded-full border border-destructive/60 bg-transparent px-4 text-xs font-medium text-destructive hover:bg-destructive/5 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+      className="inline-flex h-10 items-center justify-center rounded-full border border-border bg-transparent px-4 text-sm font-medium text-destructive hover:border-destructive/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
     >
       {pending ? "Rejecting…" : "Reject decision"}
     </button>
@@ -300,7 +291,7 @@ function UseAlternativeButton() {
     <button
       type="submit"
       disabled={pending}
-      className="inline-flex h-8 items-center justify-center rounded-full border border-emerald-600/50 bg-emerald-500/[0.06] px-4 text-xs font-medium text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+      className="inline-flex h-10 items-center justify-center rounded-full border border-border bg-transparent px-4 text-sm font-medium text-foreground hover:border-foreground/40 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
     >
       {pending ? "Preparing…" : "Use alternative"}
     </button>
@@ -313,7 +304,7 @@ function SuggestRevisionButton() {
     <button
       type="submit"
       disabled={pending}
-      className="inline-flex h-8 items-center justify-center rounded-full border border-foreground/40 bg-foreground/[0.04] px-4 text-xs font-medium text-foreground hover:bg-foreground hover:text-background disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+      className="inline-flex h-10 items-center justify-center rounded-full border border-foreground bg-foreground px-4 text-sm font-medium text-background hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
     >
       {pending ? "Proposing revision…" : "Suggest revision"}
     </button>
@@ -326,7 +317,7 @@ function ApproveRevisionButton() {
     <button
       type="submit"
       disabled={pending}
-      className="inline-flex h-8 items-center justify-center rounded-full border border-foreground bg-foreground px-4 text-xs font-medium text-background hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+      className="inline-flex h-11 items-center justify-center rounded-full border border-foreground bg-foreground px-5 text-sm font-medium text-background hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
     >
       {pending ? "Approving…" : "Approve revision"}
     </button>
@@ -339,7 +330,7 @@ function RejectRevisionButton() {
     <button
       type="submit"
       disabled={pending}
-      className="inline-flex h-8 items-center justify-center rounded-full border border-border bg-transparent px-4 text-xs font-medium text-muted-foreground hover:text-foreground hover:border-muted-foreground disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+      className="inline-flex h-10 items-center justify-center rounded-full border border-border bg-transparent px-4 text-sm font-medium text-muted-foreground hover:text-foreground hover:border-foreground/40 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
     >
       {pending ? "Rejecting…" : "Reject revision"}
     </button>
@@ -355,32 +346,40 @@ function RevisionPreviewCard({
 }) {
   const [appState, appAction] = useActionState(bindRevisionApprove, {});
   const [rejState, rejAction] = useActionState(bindRevisionReject, {});
-  void appState;
-  void rejState;
+  const approved = appState.newState === "approved";
+  const rejected = rejState.newState === "rejected";
   return (
-    <div className="rounded-xl border border-emerald-600/30 bg-card overflow-hidden">
-      <div className="p-5 space-y-3">
-        <div className="flex items-center gap-2">
-          <CategoryBadge cat={draft.category} />
-          <h5 className="text-sm font-semibold text-foreground tracking-tight">
-            {draft.title}
-          </h5>
-        </div>
-        <p className="text-xs leading-relaxed whitespace-pre-wrap text-foreground">
-          {draft.content}
+    <div className="space-y-3">
+      <div className="space-y-1.5">
+        <CategoryBadge cat={draft.category} />
+        <h5 className="text-[1.05rem] leading-snug text-foreground">{draft.title}</h5>
+      </div>
+      <p className="text-[0.95rem] leading-relaxed whitespace-pre-wrap text-foreground/90">
+        {draft.content}
+      </p>
+      {draft.rationale && (
+        <p className="text-[0.88rem] leading-relaxed text-muted-foreground whitespace-pre-wrap border-l-2 border-border/60 pl-4">
+          <span className="text-foreground/70">Why:</span> {draft.rationale}
         </p>
-        {draft.rationale && (
-          <div className="text-[11px] leading-relaxed text-muted-foreground border-l-2 border-border pl-2.5 whitespace-pre-wrap">
-            <span className="uppercase tracking-[0.18em] mr-1.5 text-[9px]">Rationale</span>
-            {draft.rationale}
-          </div>
-        )}
-        {draft.uncertainty && (
-          <div className="text-[11px] text-amber-700 dark:text-amber-300 whitespace-pre-wrap">
-            <span className="uppercase tracking-[0.18em] mr-1.5 text-[9px]">Uncertainty</span>
-            {draft.uncertainty}
-          </div>
-        )}
+      )}
+      {draft.uncertainty && (
+        <p className="text-[0.88rem] leading-relaxed text-muted-foreground whitespace-pre-wrap">
+          <span className="text-foreground/70">Not certain:</span> {draft.uncertainty}
+        </p>
+      )}
+
+      {/* Approval resolves in place: the control is replaced by its result so
+          the outcome is unmistakable without a toast. */}
+      {approved ? (
+        <span className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-primary/25 bg-accent/50 px-4 text-sm font-medium text-accent-foreground">
+          <ConfirmCheck className="text-primary" />
+          Revision approved
+        </span>
+      ) : rejected ? (
+        <span className="inline-flex h-10 items-center justify-center rounded-full border border-border px-4 text-sm text-muted-foreground">
+          Revision rejected
+        </span>
+      ) : (
         <div className="flex items-center gap-3 flex-wrap pt-1">
           <form action={appAction} className="contents">
             <input type="hidden" name="startupId" value={startupId} />
@@ -412,7 +411,7 @@ function RevisionPreviewCard({
             <RejectRevisionButton />
           </form>
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -451,44 +450,42 @@ function IssueCard({
   }
 
   return (
-    <li className="rounded-xl border border-border bg-card text-card-foreground overflow-hidden">
-      <div className="p-5 sm:p-6 space-y-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <span
-              className={`inline-flex items-center text-[10px] uppercase tracking-[0.18em] border rounded-full px-2 py-0.5 font-medium ${
-                SEVERITY_STYLE[issue.severity] ?? SEVERITY_STYLE.low
-              }`}
-            >
-              {checkLabel(issue.check_type)}
-            </span>
-            <CategoryBadge cat={issue.affected_category} />
-            {decision && (
-              <span className="text-xs font-medium text-foreground">{decision.title}</span>
-            )}
-          </div>
-          <SectionLabel>Issue</SectionLabel>
+    <li className="rise space-y-6 border-l-2 border-border/60 pl-5 sm:pl-7">
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+          <span
+            className={`eyebrow rounded-full border px-2.5 py-0.5 ${
+              SEVERITY_STYLE[issue.severity] ?? SEVERITY_STYLE.low
+            }`}
+          >
+            {checkLabel(issue.check_type)}
+          </span>
+          <CategoryBadge cat={issue.affected_category} />
+          {decision && (
+            <span className="text-[0.9rem] text-foreground/90">{decision.title}</span>
+          )}
         </div>
 
-        <div>
-          <h4 className="text-sm font-semibold text-foreground mb-1.5 tracking-tight">
+        <div className="space-y-2">
+          <p className="eyebrow">The AI says</p>
+          <h4 className="display text-[1.3rem] sm:text-[1.45rem] leading-snug max-w-2xl">
             {issue.issue_title}
           </h4>
-          <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap">
+          <p className="text-[1rem] leading-[1.7] text-foreground/90 whitespace-pre-wrap max-w-2xl">
             {issue.issue}
           </p>
         </div>
 
-        <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-1">
-          <SectionLabel>Evidence</SectionLabel>
-          <p className="text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap pt-1">
+        <div className="space-y-1.5">
+          <SectionLabel>Evidence it rests on</SectionLabel>
+          <p className="text-[0.92rem] leading-relaxed text-muted-foreground whitespace-pre-wrap border-l-2 border-border/60 pl-4 max-w-2xl">
             {issue.evidence}
           </p>
         </div>
 
-        <div className="rounded-lg border border-emerald-600/30 bg-emerald-500/[0.04] p-4 space-y-1">
-          <SectionLabel>Proposed alternative</SectionLabel>
-          <p className="text-xs leading-relaxed text-foreground whitespace-pre-wrap pt-1">
+        <div className="space-y-1.5">
+          <SectionLabel>What it proposes instead</SectionLabel>
+          <p className="text-[0.98rem] leading-[1.65] text-foreground/90 whitespace-pre-wrap border-l-2 border-primary/30 pl-4 max-w-2xl">
             {issue.proposed_alternative}
           </p>
         </div>
@@ -498,8 +495,11 @@ function IssueCard({
             (evaluation) => evaluation.subject === issue.id,
           )}
         />
+      </div>
 
-        <div className="flex flex-wrap items-center gap-3 pt-2">
+      <div className="space-y-3">
+        <SectionLabel>Your response</SectionLabel>
+        <div className="flex flex-wrap items-center gap-3">
           <form action={dismissIssueAction} className="contents">
             <input type="hidden" name="issueId" value={issue.id} />
             <KeepButton />
@@ -534,25 +534,25 @@ function IssueCard({
         </div>
 
         {(error ?? alternativeState.error) && (
-          <p className="text-xs text-destructive">
+          <p className="text-[0.9rem] text-destructive">
             {error ?? alternativeState.error}
           </p>
         )}
-
-        {previews.length > 0 && (
-          <div className="border-t border-border pt-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <SectionLabel>Proposed revision · for founder review</SectionLabel>
-              <span className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
-                Approve in Brand tab to apply
-              </span>
-            </div>
-            {previews.map((p) => (
-              <RevisionPreviewCard key={p.tempId} draft={p} startupId={startupId} />
-            ))}
-          </div>
-        )}
       </div>
+
+      {previews.length > 0 && (
+        <div className="space-y-5 pt-4">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <SectionLabel>Proposed revision</SectionLabel>
+            <span className="text-[0.8rem] text-muted-foreground/80">
+              Approve in Brand to apply — nothing changes without you
+            </span>
+          </div>
+          {previews.map((p) => (
+            <RevisionPreviewCard key={p.tempId} draft={p} startupId={startupId} />
+          ))}
+        </div>
+      )}
     </li>
   );
 }
@@ -577,69 +577,66 @@ function ConsistencyRow({
   }
   const needsFix = pair.result === "NEEDS_REVIEW" && Boolean(pair.suggested_fix);
   return (
-    <li className="rounded-xl border border-border bg-card text-card-foreground">
-      <div className="p-5 space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <span
-              className={`inline-flex items-center text-[10px] uppercase tracking-[0.18em] border rounded-full px-2 py-0.5 font-medium ${
-                RESULT_STYLE[pair.result] ?? RESULT_STYLE.NEEDS_REVIEW
-              }`}
-            >
-              {RESULT_LABEL[pair.result] ?? pair.result}
-            </span>
-            <span className="text-sm font-medium text-foreground">{pair.pair}</span>
-          </div>
-        </div>
-        <p className="text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap">
-          {pair.explanation}
-        </p>
-        {pair.evidence.length > 0 && (
-          <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-1">
-            <SectionLabel>Evidence</SectionLabel>
-            <ul className="pt-1 space-y-1 list-disc pl-4">
-              {pair.evidence.map((quote) => (
-                <li
-                  key={quote}
-                  className="text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap"
-                >
-                  {quote}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-        {needsFix && (
-          <div className="rounded-lg border border-amber-600/40 bg-amber-500/[0.04] p-4 space-y-1">
-            <SectionLabel>Suggested fix</SectionLabel>
-            <p className="text-xs leading-relaxed whitespace-pre-wrap pt-1 text-foreground">
-              {pair.suggested_fix}
-            </p>
-          </div>
-        )}
-        <EvaluationPanel
-          evaluation={evaluations?.find(
-            (evaluation) => evaluation.subject === pair.pair,
-          )}
-        />
-        {needsFix && (
-          <form action={pairReviseAction} className="contents">
-            <input type="hidden" name="startupId" value={startupId} />
-            <input type="hidden" name="pair" value={pair.pair} />
-            <input type="hidden" name="suggestedFix" value={pair.suggested_fix ?? ""} />
-            <div className="pt-1">
-              <SuggestRevisionButton />
-            </div>
-          </form>
-        )}
-        {pairPreviews.length > 0 && (
-          <div className="space-y-3 pt-3 border-t border-border">
-            {pairPreviews.map((d) => (
-              <RevisionPreviewCard key={d.tempId} draft={d} startupId={startupId} />
-            ))}
-          </div>
-        )}
+    <li className="rise space-y-3">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+        <span
+          className={`eyebrow rounded-full border px-2.5 py-0.5 ${
+            RESULT_STYLE[pair.result] ?? RESULT_STYLE.NEEDS_REVIEW
+          }`}
+        >
+          {RESULT_LABEL[pair.result] ?? pair.result}
+        </span>
+        <span className="text-[1rem] text-foreground/90">{pair.pair}</span>
       </div>
+      <p className="text-[0.95rem] leading-relaxed text-muted-foreground whitespace-pre-wrap max-w-2xl">
+        {pair.explanation}
+      </p>
+      {pair.evidence.length > 0 && (
+        <div className="space-y-1.5">
+          <SectionLabel>Evidence</SectionLabel>
+          <ul className="space-y-1.5 border-l-2 border-border/60 pl-4">
+            {pair.evidence.map((quote) => (
+              <li
+                key={quote}
+                className="text-[0.9rem] leading-relaxed text-muted-foreground whitespace-pre-wrap"
+              >
+                {quote}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {needsFix && (
+        <div className="space-y-1.5">
+          <SectionLabel>Suggested fix</SectionLabel>
+          <p className="text-[0.95rem] leading-relaxed whitespace-pre-wrap text-foreground/90 border-l-2 border-primary/30 pl-4 max-w-2xl">
+            {pair.suggested_fix}
+          </p>
+        </div>
+      )}
+      <EvaluationPanel
+        evaluation={evaluations?.find(
+          (evaluation) => evaluation.subject === pair.pair,
+        )}
+      />
+      {needsFix && (
+        <form action={pairReviseAction} className="contents">
+          <input type="hidden" name="startupId" value={startupId} />
+          <input type="hidden" name="pair" value={pair.pair} />
+          <input type="hidden" name="suggestedFix" value={pair.suggested_fix ?? ""} />
+          <div className="pt-1">
+            <SuggestRevisionButton />
+          </div>
+        </form>
+      )}
+      {pairPreviews.length > 0 && (
+        <div className="space-y-4 pt-3">
+          <SectionLabel>Proposed revision</SectionLabel>
+          {pairPreviews.map((d) => (
+            <RevisionPreviewCard key={d.tempId} draft={d} startupId={startupId} />
+          ))}
+        </div>
+      )}
     </li>
   );
 }
@@ -780,37 +777,28 @@ export function ChallengeSection({
   }, [consistencyState, publishConsistencyRun]);
 
   return (
-    <section className="space-y-8">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h2 className="text-xs uppercase tracking-[0.18em] text-muted-foreground mb-1">
-            Challenge
-          </h2>
-          <p className="text-sm text-muted-foreground max-w-xl">
-            Brand Critic checks each active decision for generic language, contradictions,
-            bias, audience mismatch, and unsupported claims. Consistency Guardian
-            cross-checks 9 decision pairs. Every finding quotes the wording it rests on.
-          </p>
-        </div>
+    <section className="space-y-16 max-w-3xl">
+      <div className="space-y-3">
+        <p className="eyebrow">Challenge</p>
+        <h2 className="display text-[2.1rem] sm:text-[2.5rem] leading-[1.1]">
+          Don’t agree with the AI just because it sounds confident.
+        </h2>
+        <p className="text-[0.98rem] leading-relaxed text-muted-foreground max-w-xl">
+          The Brand Critic looks for generic language, contradictions, bias, audience
+          mismatch, and claims with nothing behind them. The Consistency Guardian
+          cross-checks every pair of decisions. Every finding quotes the exact wording
+          it rests on, so you can judge it yourself.
+        </p>
       </div>
 
-      <div className="rounded-2xl border border-border bg-card text-card-foreground p-5 sm:p-6 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-          <div className="max-w-xl space-y-1">
-            <h3 className="text-lg font-semibold leading-tight tracking-tight">
-              Press the brand for weak spots
-            </h3>
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              Challenge finds defects in already-approved decisions. Consistency checks
-              every decision pair for internal alignment. Resolve one at a time: Keep,
-              Reject, or Suggest Revision.
+      <div className="space-y-5 border-t border-border/70 pt-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
+          <div className="max-w-lg space-y-2">
+            <h3 className="display text-[1.35rem]">Press the brand for weak spots</h3>
+            <p className="text-[0.95rem] leading-relaxed text-muted-foreground">
+              Findings appear as a conversation. You answer each one: keep the
+              decision, reject it, or ask for a revision. Nothing changes until you do.
             </p>
-            <div className="pt-1">
-              <WorkflowDisclosure
-                referenceIds={[critiqueState.referenceIds, consistencyState.referenceIds]}
-                evaluationError={[critiqueState.evaluationError, consistencyState.evaluationError]}
-              />
-            </div>
           </div>
           <div className="flex flex-col sm:items-end gap-3">
             <form action={critiqueDispatch} className="contents">
@@ -824,95 +812,93 @@ export function ChallengeSection({
           </div>
         </div>
 
+        <div>
+          <WorkflowDisclosure
+            referenceIds={[critiqueState.referenceIds, consistencyState.referenceIds]}
+            evaluationError={[critiqueState.evaluationError, consistencyState.evaluationError]}
+          />
+        </div>
+
         {(critiqueState.configError || consistencyState.configError) &&
           critiqueState.error && (
-            <div className="rounded-xl border border-border bg-muted/40 p-5 space-y-2">
-              <div className="text-[11px] uppercase tracking-[0.18em] font-medium text-foreground">
-                AI not configured
-              </div>
-              <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
+            <div className="rounded-2xl border border-border/80 bg-muted/30 p-5 space-y-2">
+              <div className="eyebrow">AI not configured</div>
+              <p className="text-[0.9rem] text-muted-foreground whitespace-pre-wrap leading-relaxed">
                 {critiqueState.error ?? consistencyState.error}
               </p>
             </div>
           )}
 
         {!critiqueState.configError && critiqueState.error && (
-          <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-5 text-sm text-destructive whitespace-pre-wrap leading-relaxed">
+          <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-5 text-[0.9rem] text-destructive whitespace-pre-wrap leading-relaxed">
             {critiqueState.error}
           </div>
         )}
 
         {!consistencyState.configError && consistencyState.error && (
-          <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-5 text-sm text-destructive whitespace-pre-wrap leading-relaxed">
+          <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-5 text-[0.9rem] text-destructive whitespace-pre-wrap leading-relaxed">
             {consistencyState.error}
           </div>
         )}
       </div>
 
       {/* Issues area */}
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
+      <div className="space-y-6">
+        <div className="flex flex-wrap items-baseline justify-between gap-3">
+          <div className="space-y-1">
             <SectionLabel>Brand Critic</SectionLabel>
-            <h3 className="text-sm font-semibold tracking-tight mt-1 text-foreground">
-              Issues found
-            </h3>
+            <h3 className="display text-[1.35rem] mt-1">Issues found</h3>
           </div>
           {issues.length > 0 && (
-            <div className="text-xs text-muted-foreground flex items-center gap-3">
+            <div className="text-[0.85rem] text-muted-foreground flex items-center gap-3 tabular-nums">
               <span>
-                <span className="font-medium text-destructive">
+                <span className="text-foreground">
                   {severityCounts.high}
                 </span>{" "}
                 high
               </span>
               <span>
-                <span className="font-medium text-amber-700 dark:text-amber-300">
+                <span className="text-foreground">
                   {severityCounts.medium}
                 </span>{" "}
                 medium
               </span>
               <span>
-                <span className="font-medium text-emerald-700 dark:text-emerald-300">
+                <span className="text-foreground">
                   {severityCounts.low}
                 </span>{" "}
                 low
               </span>
               <span>·</span>
-              <span>
-                {dismissedIds.size} dismissed
-              </span>
+              <span>{dismissedIds.size} dismissed</span>
             </div>
           )}
         </div>
 
         {activeOnly.length === 0 && (
-          <div className="rounded-xl border border-dashed border-border p-8 text-center space-y-2 text-sm text-muted-foreground">
-            <span className="block uppercase tracking-[0.18em] text-[10px] mb-1">
-              No active decisions
-            </span>
-            Generate strategy in the Brand tab, approve at least one decision, then
-            return here to challenge it.
-          </div>
+          <p className="text-[0.95rem] text-muted-foreground leading-relaxed max-w-xl">
+            There are no active decisions yet. Generate a strategy in the Brand stage
+            and approve at least one decision, then come back and challenge it.
+          </p>
         )}
 
         {activeOnly.length > 0 && !critiqueState.issues && !critiqueState.error && (
-          <div className="rounded-xl border border-dashed border-border p-8 text-center space-y-2 text-sm text-muted-foreground">
-            <span className="block uppercase tracking-[0.18em] text-[10px] mb-1">
-              Challenge not run yet
-            </span>
-            Click &quot;Challenge active brand decisions&quot; above to begin.
-          </div>
+          <p className="text-[0.95rem] text-muted-foreground leading-relaxed max-w-xl">
+            Nothing has been challenged yet. Start with{" "}
+            <span className="text-foreground/80">Challenge active brand decisions</span>{" "}
+            above.
+          </p>
         )}
 
         {visibleIssues.length === 0 && issues.length > 0 && (
-          <div className="rounded-xl border border-border bg-muted/20 p-6 text-sm text-muted-foreground text-center">
-            All issues dismissed. Brand looks clean, but always apply founder judgment.
-          </div>
+          <p className="text-[0.98rem] leading-relaxed text-muted-foreground max-w-xl">
+            Every issue has been dismissed. The brand looks clean — but keep applying
+            your own judgment to it.
+          </p>
         )}
 
         {visibleIssues.length > 0 && (
-          <ul className="space-y-3">
+          <ul className="space-y-12">
             {visibleIssues.map((issue) => (
               <IssueCard
                 key={issue.id}
@@ -927,23 +913,21 @@ export function ChallengeSection({
         )}
 
         {critiqueCompleted && issues.length === 0 && (
-          <div className="rounded-xl border border-emerald-600/40 bg-emerald-500/[0.04] p-6 text-sm text-muted-foreground text-center space-y-1">
-            <span className="block text-emerald-700 dark:text-emerald-300 font-medium">
-              ✓ No issues found
-            </span>
-            <span className="block">
-              The five checks ran against {activeOnly.length} active decision
-              {activeOnly.length === 1 ? "" : "s"} and found nothing that needs your
-              review. Keep working from the approved decisions, or challenge the
-              reasoning behind any of them in the Brand tab.
-            </span>
+          <div className="space-y-2 max-w-2xl">
+            <p className="display text-[1.3rem]">Nothing needs your review.</p>
+            <p className="text-[0.98rem] leading-relaxed text-muted-foreground">
+              All five checks ran against {activeOnly.length} active decision
+              {activeOnly.length === 1 ? "" : "s"} and found nothing worth arguing
+              with. Keep building from the approved decisions, or challenge the
+              reasoning behind any of them in the Brand stage.
+            </p>
             {ungroundedChecks.length > 0 && (
-              <span className="block text-xs">
+              <p className="text-[0.88rem] leading-relaxed text-muted-foreground/85">
                 {ungroundedChecks.length} check
                 {ungroundedChecks.length === 1 ? "" : "s"} could not be grounded — the
                 evidence for {ungroundedChecks.length === 1 ? "it" : "them"} is missing,
                 so no verdict was reported. Details below.
-              </span>
+              </p>
             )}
           </div>
         )}
@@ -952,55 +936,52 @@ export function ChallengeSection({
       </div>
 
       {/* Consistency area */}
-      <div className="space-y-4 pt-4 border-t border-border">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
+      <div className="space-y-6">
+        <div className="rule" />
+        <div className="flex flex-wrap items-baseline justify-between gap-3">
+          <div className="space-y-1">
             <SectionLabel>Consistency Guardian</SectionLabel>
-            <h3 className="text-sm font-semibold tracking-tight mt-1 text-foreground">
+            <h3 className="display text-[1.35rem] mt-1">
               9 decision pair cross-checks
             </h3>
           </div>
           {consistencyResults && (
-            <div className="text-xs text-muted-foreground flex items-center gap-3">
+            <div className="text-[0.85rem] text-muted-foreground flex items-center gap-3 tabular-nums">
               <span>
-                <span className="font-medium text-emerald-700 dark:text-emerald-300">
-                  {consistencyCounts.PASS}
-                </span>{" "}
-                PASS
+                <span className="text-foreground">{consistencyCounts.PASS}</span> passed
               </span>
               <span>
-                <span className="font-medium text-amber-700 dark:text-amber-300">
+                <span className="text-foreground">
                   {consistencyCounts.NEEDS_REVIEW}
                 </span>{" "}
-                NEEDS REVIEW
+                need review
               </span>
               <span>
-                <span className="font-medium text-muted-foreground">
+                <span className="text-foreground">
                   {consistencyCounts.INSUFFICIENT_EVIDENCE}
                 </span>{" "}
-                INSUFFICIENT EVIDENCE
+                ungrounded
               </span>
               <span>
-                <span className="font-medium text-muted-foreground">
+                <span className="text-foreground">
                   {consistencyCounts.NOT_CHECKED}
                 </span>{" "}
-                NOT CHECKED
+                not checked
               </span>
             </div>
           )}
         </div>
 
         {!consistencyResults && !consistencyState.error && (
-          <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-            <span className="block uppercase tracking-[0.18em] text-[10px] mb-1">
-              Not run yet
-            </span>
-            Click &quot;Run consistency check&quot; above to evaluate all 9 pairs.
-          </div>
+          <p className="text-[0.95rem] text-muted-foreground leading-relaxed max-w-xl">
+            Not run yet. Use{" "}
+            <span className="text-foreground/80">Run consistency check</span> above to
+            evaluate all nine pairs.
+          </p>
         )}
 
         {consistencyResults && (
-          <ul className="space-y-3">
+          <ul className="space-y-8 border-l border-border/60 pl-5 sm:pl-8">
             {consistencyResults.map((pair, idx) => (
               <ConsistencyRow
                 key={`${pair.pair}-${idx}`}
